@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Financial Analysis Agent</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#212121; color:#ececf1; }
+    * { box-sizing:border-box; }
+    html, body { height:100%; overflow:hidden; }
+    body { margin:0; min-height:100vh; background:#212121; --right-width:52px; }
+    body.right-open { --right-width:440px; }
+    .layout { height:calc(100vh - 56px); min-height:0; display:grid; grid-template-columns:260px minmax(0,1fr) var(--right-width); position:relative; overflow:hidden; transition:grid-template-columns .18s ease; }
+    .sidebar { height:calc(100vh - 56px); min-height:0; border-right:1px solid #303030; padding:18px 10px 10px; color:#d7d7d7; overflow:hidden; background:linear-gradient(270deg, rgba(255,255,255,.018), transparent 18%); display:flex; flex-direction:column; gap:12px; }
+    .side-section { min-height:0; border:1px solid #3a3a3a; border-radius:16px; background:#252525; overflow:hidden; display:flex; flex-direction:column; }
+    #briefsSection:not(.collapsed) { flex:0 0 22%; }
+    #reportsSection:not(.collapsed) { flex:0 0 27%; }
+    #eventsSection:not(.collapsed) { flex:1 1 0; }
+    .side-section.collapsed { flex:0 0 auto; }
+    .side-toggle { width:100%; flex-shrink:0; border:0; background:transparent; color:#f4f4f4; cursor:pointer; display:flex; align-items:center; gap:7px; padding:13px 12px; font:inherit; font-size:14px; font-weight:600; text-align:left; white-space:nowrap; }
+    .side-toggle .chev { color:#9b9b9b; transition:transform .16s ease; }
+    .side-section.collapsed .side-toggle .chev { transform:rotate(-90deg); }
+    .side-content { display:grid; align-content:start; gap:8px; flex:1 1 auto; min-height:0; padding:0 8px 10px; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#4c4c4c transparent; }
+    .side-content::-webkit-scrollbar { width:6px; }
+    .side-content::-webkit-scrollbar-track { background:transparent; }
+    .side-content::-webkit-scrollbar-thumb { background:#4c4c4c; border-radius:999px; }
+    .side-content::-webkit-scrollbar-thumb:hover { background:#5c5c5c; }
+    .side-section.collapsed .side-content, .side-section.collapsed .event-list { display:none; }
+    .events-section .side-toggle { flex-shrink:0; }
+    .report-empty { color:#8e8e8e; font-size:13px; padding:8px 7px 10px; line-height:1.45; }
+    .report-item { width:100%; border:0; border-radius:12px; background:transparent; color:#e7e7e7; text-align:left; padding:10px 9px; cursor:pointer; font:inherit; }
+    .report-row { position:relative; display:grid; grid-template-columns:1fr 24px; gap:6px; align-items:start; border-radius:12px; }
+    .report-row:hover { background:#333; }
+    .report-row .report-item { min-width:0; padding-right:4px; }
+    .report-row .report-item:hover { background:transparent; }
+    .report-actions { display:grid; gap:4px; justify-items:center; padding-top:8px; }
+    .report-delete, .report-download { width:22px; height:22px; border:0; border-radius:7px; background:transparent; color:#8f8f8f; cursor:pointer; display:grid; place-items:center; font-size:13px; line-height:1; opacity:.72; }
+    .report-delete:hover { background:rgba(229,72,77,.16); color:#ff777b; opacity:1; }
+    .report-download:hover { background:rgba(255,255,255,.08); color:#f2f2f2; opacity:1; }
+    .report-download svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .report-item small { display:block; color:#9f9f9f; margin-top:4px; line-height:1.35; }
+    .report-view { max-width:min(860px, 100%); margin:22px auto; padding:20px; border:1px solid #3a3a3a; border-radius:18px; background:#262626; }
+    .report-view-head { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#aaa; margin-bottom:12px; }
+    .report-view-title { color:#f4f4f4; font-weight:650; }
+    .report-view pre { white-space:pre-wrap; margin:0; color:#ececf1; font:15px/1.62 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    .events-section { min-height:0; display:flex; flex-direction:column; }
+    .events-actions { display:inline-flex; align-items:center; gap:5px; }
+    .events-refresh, .events-add { border:0; border-radius:999px; background:#333; color:#ddd; cursor:pointer; padding:5px 8px; font-size:12px; }
+    .events-add { font-size:13px; font-weight:700; }
+    .events-refresh:hover, .events-add:hover { background:#3d3d3d; color:#fff; }
+    .event-list { display:grid; align-content:start; flex:1 1 auto; padding:0 12px 10px; overflow:auto; min-height:0; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#4c4c4c transparent; }
+    .event-row { position:relative; display:grid; grid-template-columns:1fr 24px; gap:5px; padding:11px 0; color:#e7e7e7; font-size:12px; line-height:1.3; border-top:1px solid #3b3b3b; }
+    .event-row:first-child { border-top:0; }
+    .event-main { min-width:0; display:grid; gap:5px; }
+    .event-when { display:flex; align-items:center; gap:12px; color:#bdbdbd; font-variant-numeric:tabular-nums; }
+    .event-date { color:#dcdcdc; font-weight:650; white-space:nowrap; }
+    .event-time { color:#aaa; white-space:nowrap; }
+    .event-title { color:#f0f0f0; overflow:hidden; text-overflow:ellipsis; }
+    .event-more { width:22px; height:22px; border:0; border-radius:7px; background:transparent; color:#aaa; cursor:pointer; display:grid; place-items:center; font-size:12px; line-height:1; }
+    .event-more:hover, .event-more.open { background:#3a3a3a; color:#fff; }
+    .event-menu { position:absolute; right:0; top:37px; z-index:35; width:110px; border:1px solid #4b4b4b; border-radius:12px; background:#303030; box-shadow:0 12px 32px rgba(0,0,0,.42); padding:5px; display:none; }
+    .event-menu.open { display:grid; }
+    .event-menu button { border:0; border-radius:8px; background:transparent; color:#f4f4f4; cursor:pointer; text-align:left; padding:8px 9px; font:inherit; font-size:12px; }
+    .event-menu button:hover { background:#3d3d3d; }
+    .event-menu .danger-link { color:#ff777b; }
+
+    .right-rail { grid-column:3; grid-row:1; height:calc(100vh - 56px); overflow:hidden; display:grid; grid-template-columns:1fr 52px; border-left:1px solid #303030; background:linear-gradient(90deg, rgba(255,255,255,.018), transparent 18%); }
+    .right-tabs { grid-column:2; width:52px; padding:14px 6px; display:flex; flex-direction:column; align-items:center; gap:12px; border-left:1px solid #303030; background:#212121; }
+    .right-tab { width:38px; height:38px; border:0; border-radius:14px; background:transparent; color:#dcdcdc; cursor:pointer; display:grid; place-items:center; line-height:1; transition:background .14s ease, color .14s ease, transform .14s ease; }
+    .right-tab svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .right-tab:hover, .right-tab.active { background:rgba(255,255,255,.095); color:#fff; }
+    .right-tab:active { transform:scale(.96); }
+    .right-panel { grid-column:1; grid-row:1; min-width:0; height:100%; display:none; flex-direction:column; align-items:center; gap:18px; padding:22px 14px 10px; overflow:hidden; }
+    body.right-open .right-panel.active { display:flex; }
+    .broker-top { position:static; z-index:15; display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; }
+    .broker-btn { height:44px; border:1px solid #555; border-radius:999px; padding:0 18px; background:#2f2f2f; color:#f4f4f4; cursor:pointer; font:inherit; font-weight:600; box-shadow:0 10px 28px rgba(0,0,0,.22); }
+    .broker-btn:hover { background:#3a3a3a; }
+    .broker-dot { width:9px; height:9px; border-radius:999px; background:#777; display:inline-block; margin-right:8px; }
+    .broker-dot.on { background:#52d6a8; }
+    .disconnect-btn { width:28px; height:28px; border:0; border-radius:7px; background:#e5484d; color:white; cursor:pointer; display:none; box-shadow:0 8px 22px rgba(229,72,77,.28); }
+    .disconnect-btn.show { display:grid; place-items:center; }
+    .disconnect-btn:hover { background:#ff5c61; }
+    .portfolio-panel { width:300px; max-height:44vh; overflow:auto; z-index:14; border:1px solid #3a3a3a; border-radius:18px; background:#252525; box-shadow:0 16px 42px rgba(0,0,0,.3); padding:14px; color:#e7e7e7; flex-shrink:0; }
+    .portfolio-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .portfolio-title { font-weight:700; color:#f4f4f4; }
+    .portfolio-refresh { border:0; border-radius:999px; background:#333; color:#ddd; cursor:pointer; padding:6px 9px; }
+    .portfolio-cols, .holding { display:grid; grid-template-columns:58px 1fr 90px; gap:8px; align-items:center; }
+    .portfolio-cols { padding:0 0 7px; color:#8f8f8f; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid #343434; }
+    .portfolio-cols div:last-child { text-align:right; }
+    .holding { padding:9px 0; border-top:1px solid #343434; }
+    .portfolio-cols + .holding { border-top:0; }
+    .holding-ticker { font-weight:700; color:#f4f4f4; }
+    .holding-name { color:#aaa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .holding-price { color:#dcdcdc; font-variant-numeric:tabular-nums; text-align:right; }
+    .portfolio-composition { width:300px; min-height:0; margin-top:-18px; display:none; align-items:center; justify-content:center; flex:1; overflow:hidden; }
+    .preview-panel { align-items:stretch; padding:18px 12px 10px; }
+    .preview-card { width:100%; height:100%; min-height:0; display:flex; flex-direction:column; border:1px solid #3a3a3a; border-radius:18px; background:#252525; box-shadow:0 16px 42px rgba(0,0,0,.3); color:#e7e7e7; overflow:hidden; }
+    .preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:14px 14px 10px; border-bottom:1px solid #343434; }
+    .preview-title { min-width:0; display:grid; gap:4px; font-weight:700; color:#f4f4f4; }
+    .preview-title small { color:#9f9f9f; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .preview-close { width:28px; height:28px; border:0; border-radius:999px; background:#333; color:#ddd; cursor:pointer; flex-shrink:0; }
+    .preview-close:hover { background:#3d3d3d; color:#fff; }
+    .preview-body { flex:1; min-height:0; overflow:auto; padding:14px; }
+    .preview-body.pdf { padding:0; background:#f1f1f1; }
+    .preview-body pre { white-space:pre-wrap; word-break:break-word; margin:0; color:#ececf1; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .pdf-frame { width:100%; height:100%; border:0; background:#f1f1f1; }
+    .preview-empty { color:#9f9f9f; line-height:1.45; padding:8px; font-size:13px; }
+
+    #notificationsTab{position:relative}#notificationsTab.has-unread::after{content:'';position:absolute;right:5px;top:5px;width:7px;height:7px;border-radius:50%;background:#ff4545;border:2px solid #252525}
+    .notifications-panel { align-items:stretch; padding:18px 12px 10px; }
+    .notifications-card { width:100%; height:100%; min-height:0; display:flex; flex-direction:column; border:1px solid #3a3a3a; border-radius:18px; background:#252525; box-shadow:0 16px 42px rgba(0,0,0,.3); color:#e7e7e7; overflow:hidden; }
+    .notifications-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px; border-bottom:1px solid #343434; }
+    .notifications-title { font-weight:750; color:#f4f4f4; }
+    .notifications-refresh { width:28px; height:28px; border:0; border-radius:999px; background:#333; color:#ddd; cursor:pointer; }
+    .notifications-body { flex:1; min-height:0; overflow:auto; padding:10px 14px 16px; }
+    .notification-group { display:grid; gap:8px; margin-bottom:16px; }
+    .notification-group-title { color:#9f9f9f; font-size:12px; font-weight:700; letter-spacing:.02em; margin:4px 0; }
+    .notification-item { border-top:1px solid #343434; padding:10px 0 2px; display:grid; gap:5px; }
+    .notifications-card,.notifications-body,.notification-group,.notification-item { min-width:0; max-width:100%; box-sizing:border-box; }
+    .notification-group,.notification-item { grid-template-columns:minmax(0,1fr); }
+    .notification-item strong,.notification-item p,.notification-item small { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+    .notification-item:first-of-type { border-top:0; }
+    .notification-item-title { color:#f4f4f4; font-weight:700; font-size:13px; }
+    .notification-item-meta { color:#9f9f9f; font-size:11px; }
+    .notification-item-message { color:#d2d2d2; font-size:12px; line-height:1.45; white-space:pre-wrap; }
+    .portfolio-composition.show { display:flex; }
+    .composition-chart { width:min(310px, 100%); height:min(310px, 100%); overflow:visible; }
+    .composition-label { fill:#d8d8d8; font-size:10px; font-weight:650; }
+    .composition-label-sub { fill:#aaa; font-size:9px; font-weight:600; }
+    header { height:56px; display:flex; align-items:center; justify-content:center; border-bottom:1px solid #343541; color:#f4f4f4; font-weight:600; }
+    #chat { grid-column:2; width:min(920px, 100%); height:calc(100vh - 56px); min-height:0; margin:0 auto; padding:28px 16px 150px; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; }
+    .empty { min-height:calc(100vh - 260px); display:grid; place-items:center; color:#f4f4f4; font-size:28px; font-weight:600; }
+    .turn { margin:22px 0; line-height:1.58; white-space:pre-wrap; }
+    .user { display:flex; justify-content:flex-end; }
+    .bubble { max-width:min(720px, 88%); padding:12px 16px; border-radius:22px; background:#303030; color:#f4f4f4; }
+    .answer { color:#ececf1; }
+    .answer-pending { color:#9f9f9f; display:inline-flex; gap:2px; align-items:center; }
+    .answer-pending span { animation:pulse 1.2s infinite ease-in-out; }
+    .answer-pending span:nth-child(2) { animation-delay:.16s; }
+    .answer-pending span:nth-child(3) { animation-delay:.32s; }
+    @keyframes pulse { 0%, 80%, 100% { opacity:.25; } 40% { opacity:1; } }
+    details.work { margin:0 0 16px; background:transparent; color:#c8c8c8; }
+    details.work summary { cursor:pointer; list-style:none; color:#b8b8b8; font-weight:500; margin-bottom:8px; display:inline-flex; align-items:center; gap:8px; }
+    details.work summary::-webkit-details-marker { display:none; }
+    .chevron { display:inline-block; color:#9b9b9b; transform:rotate(0deg); transition:transform .16s ease; }
+    details[open] .chevron { transform:rotate(90deg); }
+    .flow { display:grid; gap:11px; padding-top:4px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; color:#c8c8c8; }
+    .flow-row { display:grid; grid-template-columns:24px 1fr; gap:8px; align-items:start; }
+    .flow-icon { color:#62d6ad; text-align:center; font-family:"SFMono-Regular", Menlo, Consolas, monospace; }
+    .flow-title { color:#e7e7e7; }
+    .flow-muted { color:#8e8e8e; margin-left:6px; }
+    .flow-tool { color:#ffd84a; }
+    .flow-row.flow-reasoning { grid-template-columns:18px minmax(0,1fr); margin:2px 0 0; }
+    .flow-row.flow-reasoning .flow-icon { color:#8b8b8b; font-size:13px; transform:translateY(2px); }
+    .flow-row.flow-reasoning .flow-title { color:#e4e4e4; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:15px; line-height:1.62; font-weight:450; letter-spacing:-.01em; }
+    .flow-row.flow-action { grid-template-columns:22px minmax(0,1fr); gap:8px; margin:0 0 1px; }
+    .flow-row.flow-action .flow-icon { color:#8f8f8f; font-size:14px; transform:translateY(1px); }
+    .flow-row.flow-action .flow-icon.flow-ok { color:#62d6ad; }
+    .flow-row.flow-action .flow-icon.flow-warn { color:#ffd84a; }
+    .flow-row.flow-action .flow-title { color:#d8d8d8; font-family:"SFMono-Regular", Menlo, Consolas, monospace; font-size:13px; font-weight:650; letter-spacing:-.01em; }
+    .flow-row.flow-action .flow-muted { color:#7d7d7d; font-family:"SFMono-Regular", Menlo, Consolas, monospace; font-size:12px; }
+    .composer-wrap { position:fixed; z-index:20; left:260px; right:var(--right-width); bottom:0; padding:16px; background:linear-gradient(180deg, rgba(33,33,33,0), #212121 30%); transition:right .18s ease; }
+    form { position:relative; width:min(860px,100%); margin:0 auto; border:1px solid #555; background:#2f2f2f; border-radius:28px; padding:10px; box-shadow:0 12px 34px rgba(0,0,0,.28); }
+    textarea { width:100%; min-height:56px; max-height:180px; resize:none; border:0; outline:0; background:transparent; color:#f4f4f4; padding:8px 10px; font:inherit; line-height:1.45; }
+    .bar { display:flex; align-items:center; gap:8px; padding:2px; }
+    .pill { display:inline-flex; align-items:center; justify-content:center; height:34px; max-width:190px; border:1px solid #555; border-radius:999px; padding:0 12px; background:#2f2f2f; color:#e7e7e7; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pill:hover { background:#3a3a3a; }
+    .icon-pill { width:34px; max-width:34px; padding:0; font-size:18px; line-height:1; }
+    .spacer { flex:1; }
+    #send { width:34px; height:34px; border:0; border-radius:50%; display:grid; place-items:center; background:#f4f4f4; color:#111; cursor:pointer; font-weight:700; }
+    #send:disabled { opacity:.62; cursor:not-allowed; }
+    .popover { position:fixed; z-index:30; width:min(520px, calc(100vw - 32px)); max-height:min(560px, calc(100vh - 135px)); overflow:auto; background:#2f2f2f; border:1px solid #555; border-radius:22px; padding:10px; display:none; box-shadow:0 18px 50px rgba(0,0,0,.42); font-size:13px; }
+    .popover.open { display:block; }
+    .item { width:100%; text-align:left; border:0; border-radius:14px; background:transparent; color:#f4f4f4; padding:9px 12px; cursor:pointer; font:inherit; font-size:13px; line-height:1.25; }
+    .item:hover, .item.active { background:#3a3a3a; }
+    .item small { display:block; color:#aaa; margin-top:4px; line-height:1.3; font-size:12px; }
+    .schedule-item { position:relative; display:grid; grid-template-columns:22px 1fr 34px; gap:8px; align-items:center; border-radius:14px; }
+    .schedule-item:hover, .schedule-item.active { background:#3a3a3a; }
+    .schedule-item .item { background:transparent; }
+    .schedule-run-indicator { width:18px; height:18px; display:grid; place-items:center; margin-left:4px; }
+    .schedule-run-indicator::before { content:""; width:10px; height:10px; border:2px solid rgba(244,244,244,.35); border-top-color:#f4f4f4; border-radius:999px; opacity:0; }
+    .schedule-item.running .schedule-run-indicator::before { opacity:1; animation:schedule-spin .8s linear infinite; }
+    @keyframes schedule-spin { to { transform:rotate(360deg); } }
+    .schedule-more { width:30px; height:30px; border:0; border-radius:10px; background:transparent; color:#cfcfcf; cursor:pointer; font-size:18px; line-height:1; display:grid; place-items:center; margin-right:4px; }
+    .schedule-more:hover, .schedule-more.open { background:#444; color:#fff; }
+    .schedule-menu { position:absolute; right:8px; top:36px; z-index:45; width:150px; border:1px solid #4b4b4b; border-radius:14px; background:#303030; box-shadow:0 14px 38px rgba(0,0,0,.42); padding:6px; display:none; }
+    .schedule-menu.open { display:grid; }
+    .schedule-menu button { width:100%; border:0; border-radius:10px; background:transparent; color:#f4f4f4; cursor:pointer; text-align:left; padding:9px 10px; font:inherit; font-size:13px; }
+    .schedule-menu button:hover { background:#3d3d3d; }
+    .schedule-menu .danger-link { color:#ff777b; }
+    .skill-item { position:relative; display:grid; grid-template-columns:1fr 34px; gap:8px; align-items:center; border-radius:14px; }
+    .skill-item:hover, .skill-item.active { background:#3a3a3a; }
+    .skill-item .item { background:transparent; }
+    .skill-more { width:30px; height:30px; border:0; border-radius:10px; background:transparent; color:#cfcfcf; cursor:pointer; font-size:18px; line-height:1; display:grid; place-items:center; margin-right:4px; }
+    .skill-more:hover, .skill-more.open { background:#444; color:#fff; }
+    .skill-menu { position:absolute; right:8px; top:36px; z-index:45; width:130px; border:1px solid #4b4b4b; border-radius:14px; background:#303030; box-shadow:0 14px 38px rgba(0,0,0,.42); padding:6px; display:none; }
+    .skill-menu.open { display:grid; }
+    .skill-menu button { width:100%; border:0; border-radius:10px; background:transparent; color:#f4f4f4; cursor:pointer; text-align:left; padding:9px 10px; font:inherit; font-size:13px; }
+    .skill-menu button:hover { background:#3d3d3d; }
+    .skill-menu .danger-link { color:#ff777b; }
+    .skill-form { display:grid; gap:12px; padding:4px 6px 2px; }
+    .skill-prompt { width:100%; min-height:330px; resize:vertical; border:1px solid #4b4b4b; border-radius:18px; background:#252525; color:#f4f4f4; padding:14px 16px; font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .selected-skills { position:absolute; left:0; right:18px; top:-34px; display:none; align-items:flex-end; gap:6px; height:34px; overflow:visible; z-index:1; }
+    .selected-skills.show { display:flex; }
+    .selected-skill-chip { position:relative; display:inline-flex; align-items:center; gap:8px; max-width:240px; height:32px; border:1px solid #555; border-radius:14px; background:#2f2f2f; color:#dcdcdc; padding:0 18px 0 12px; font-size:13px; box-shadow:0 -8px 24px rgba(0,0,0,.2); }
+    .selected-skill-chip span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .selected-skill-clear { position:absolute; right:-6px; top:-7px; width:17px; height:17px; border:1px solid #555; border-radius:999px; background:#303030; color:#bdbdbd; cursor:pointer; display:grid; place-items:center; font-size:10px; line-height:1; padding:0; }
+    .selected-skill-clear:hover { background:#444; color:#fff; border-color:#777; }
+    .pending-steers { position:absolute; left:0; right:18px; bottom:100%; display:none; flex-direction:column; gap:6px; margin-bottom:6px; z-index:2; }
+    .pending-steers.show { display:flex; }
+    .steer-card { display:grid; grid-template-columns:22px 1fr auto auto; align-items:center; gap:10px; min-height:40px; border:1px solid #555; border-radius:18px; background:#2f2f2f; color:#e7e7e7; padding:7px 9px 7px 12px; box-shadow:0 -10px 28px rgba(0,0,0,.24); font-size:13px; }
+    .steer-icon { color:#aaa; font-size:16px; }
+    .steer-text { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#f1f1f1; }
+    .steer-action, .steer-delete { border:0; background:transparent; color:#aaa; cursor:pointer; border-radius:10px; height:28px; padding:0 8px; font:inherit; font-size:13px; display:inline-flex; align-items:center; gap:5px; }
+    .steer-action:hover, .steer-delete:hover { background:#3b3b3b; color:#fff; }
+    .steer-action.sent { color:#72d6aa; cursor:default; }
+    .steer-action.sent:hover { background:transparent; }
+    .steer-delete { width:30px; justify-content:center; padding:0; font-size:15px; }
+    .new-schedule { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 8px 2px; border-top:1px solid #444; margin-top:6px; }
+    input { width:100%; border:1px solid #555; border-radius:12px; background:#242424; color:#f4f4f4; padding:10px 12px; font:inherit; }
+    .schedule-form { display:grid; gap:12px; padding:4px 6px 2px; }
+    .schedule-head { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#aaa; font-size:13px; padding:0 2px; }
+    .schedule-close { border:0; background:transparent; color:#aaa; cursor:pointer; font-size:22px; line-height:1; padding:0 2px; }
+    .schedule-title-input { border:0; background:transparent; color:#f4f4f4; font-size:18px; padding:4px 0 2px; border-radius:0; }
+    .schedule-title-input::placeholder, .schedule-prompt::placeholder { color:#8e8e8e; }
+    .schedule-prompt { width:100%; min-height:82px; resize:vertical; border:1px solid #4b4b4b; border-radius:20px; background:#252525; color:#f4f4f4; padding:14px 16px; font:inherit; font-size:13px; line-height:1.45; }
+    .schedule-section-label { color:#aaa; font-size:13px; margin:5px 0 -3px; }
+    .schedule-card { border:1px solid #454545; border-radius:20px; background:#252525; padding:0 14px; overflow:hidden; }
+    .schedule-row { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:48px; border-top:1px solid #3b3b3b; }
+    .schedule-row:first-child { border-top:0; }
+    .schedule-row label { color:#f4f4f4; font-size:13px; white-space:nowrap; }
+    .schedule-row select { width:auto; min-width:112px; max-width:165px; border:0; background:transparent; color:#f4f4f4; font:inherit; font-size:13px; text-align:right; cursor:pointer; padding:8px 0; }
+    .schedule-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; padding-top:2px; }
+    .scheduler-approval-card { border:1px solid rgba(255,205,82,.42); border-radius:18px; background:rgba(255,205,82,.08); padding:12px 14px; display:grid; gap:8px; }
+    .scheduler-approval-title { color:#f4f4f4; font-size:13px; font-weight:700; }
+    .scheduler-approval-meta { color:#bbb; font-size:12px; line-height:1.4; word-break:break-word; }
+    .scheduler-approval-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+    .scheduler-approval-actions .danger-link { color:#ff777b; border-color:rgba(255,119,123,.38); }
+    .toast { position:fixed; right:22px; bottom:118px; z-index:60; max-width:360px; border:1px solid #555; border-radius:14px; background:#2f2f2f; color:#f4f4f4; padding:12px 14px; box-shadow:0 16px 42px rgba(0,0,0,.34); display:none; }
+    .toast.show { display:block; }
+    .approval-backdrop { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; padding:22px; background:rgba(0,0,0,.42); backdrop-filter:blur(8px); }
+    .approval-backdrop.open { display:flex; }
+    .approval-card { width:min(560px, calc(100vw - 32px)); border:1px solid #555; border-radius:26px; background:#2f2f2f; color:#f4f4f4; box-shadow:0 26px 80px rgba(0,0,0,.48); padding:20px; }
+    .approval-title { font-size:18px; line-height:1.25; font-weight:700; margin:0 0 6px; }
+    .approval-subtitle { color:#aaa; font-size:13px; line-height:1.45; margin:0 0 16px; }
+    .approval-tool { border:1px solid #464646; border-radius:18px; background:#252525; padding:13px 14px; margin-bottom:16px; }
+    .approval-tool-name { font-size:14px; font-weight:700; color:#ececf1; }
+    .approval-mode { display:inline-flex; margin-left:8px; color:#aaa; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+    .approval-summary { margin-top:8px; color:#b8b8b8; font-size:12px; line-height:1.45; white-space:pre-wrap; word-break:break-word; max-height:160px; overflow:auto; }
+    .approval-actions { display:flex; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
+    .approval-actions button { height:36px; border:1px solid #555; border-radius:999px; padding:0 14px; background:#2f2f2f; color:#f4f4f4; cursor:pointer; font:inherit; font-size:13px; font-weight:600; }
+    .approval-actions button:hover { background:#3a3a3a; }
+    .approval-actions .approval-deny { color:#ff777b; border-color:rgba(255,119,123,.38); }
+    .approval-actions .approval-primary { background:#f4f4f4; color:#111; border-color:#f4f4f4; }
+    .approval-actions .approval-primary:hover { background:#fff; }
+    .danger-link { color:#ff777b; }
+    @media (max-width: 1100px) { body, body.right-open { --right-width:0px; } .layout { grid-template-columns:220px minmax(0,1fr); } .right-rail { display:none; } .composer-wrap { left:220px; right:0; } }
+    @media (max-width: 900px) { .layout { grid-template-columns:1fr; } .sidebar { display:none; } .composer-wrap { left:0; right:0; } }
+    @media (max-width: 640px) { .pill { max-width:140px; } #chat { padding-bottom:165px; } }
+  .message-attachments{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:10px;width:100%}.turn.user{flex-wrap:wrap}.message-attachment{display:flex;flex-direction:column;max-width:220px;padding:12px;border:1px solid #555;border-radius:14px;color:inherit;text-decoration:none;overflow-wrap:anywhere}.message-attachment img{width:140px;height:120px;object-fit:cover;border-radius:8px;margin-bottom:6px}
+ .message-attachment{flex-direction:row;align-items:center;gap:8px;max-width:300px;padding:7px 13px;border-radius:22px;background:transparent;font:inherit;font-size:14px;cursor:pointer}.attachment-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.attachment-draft{max-width:270px!important;padding:12px!important;border-radius:16px!important;cursor:pointer;gap:10px!important}.attachment-icon{font-size:25px;padding:8px;background:rgba(128,128,128,.12);border-radius:10px}.attachment-info{display:flex;flex-direction:column;min-width:0;gap:3px}.attachment-type{font-size:12px;opacity:.6}.attachment-draft .selected-skill-clear{align-self:flex-start}
+.turn.user .bubble{background:#1c4378;color:#f5f8ff}.review-operation{margin:12px 0}.review-operation summary{cursor:pointer;color:#bbb}
+</style>
+</head>
+<body>
+<header>Financial Analysis Agent</header>
+<div class="layout">
+  <aside class="sidebar">
+    <section class="side-section collapsed" id="briefsSection">
+      <button type="button" class="side-toggle" id="briefsToggle"><span class="chev">⌄</span><span>Daily Portfolio Brief</span></button>
+      <div class="side-content" id="briefsList"><div class="report-empty">No Daily Portfolio Briefs yet.</div></div>
+    </section>
+    <section class="side-section collapsed" id="reportsSection">
+      <button type="button" class="side-toggle" id="reportsToggle"><span class="chev">⌄</span><span>Company Research Reports</span></button>
+      <div class="side-content" id="reportsList"><div class="report-empty">No Markdown reports yet.</div></div>
+    </section>
+    <section class="side-section events-section" id="eventsSection">
+      <button type="button" class="side-toggle" id="eventsToggle"><span class="chev">⌄</span><span>Upcoming Events</span><span class="spacer"></span><span class="events-actions"><span class="events-add" id="eventsAdd" role="button" tabindex="0" aria-label="Add upcoming event">＋</span><span class="events-refresh" id="eventsRefresh" role="button" tabindex="0" aria-label="Refresh upcoming events">↻</span></span></button>
+      <div class="event-list" id="eventsList"><div class="report-empty">No upcoming events yet.</div></div>
+    </section>
+  </aside>
+  <main id="chat"><div class="empty">What would you like to analyse?</div></main>
+  <aside class="right-rail" id="rightRail">
+    <nav class="right-tabs" aria-label="Right sidebar tools">
+      <button type="button" class="right-tab" id="brokerTab" title="Broker" aria-label="Broker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.5a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z"/><path d="M7.2 20.5c.55-2.35 2.38-4 4.8-4s4.25 1.65 4.8 4"/><path d="M8.5 4.5h7"/></svg></button>
+      <button type="button" class="right-tab" id="previewTab" title="File preview" aria-label="File preview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7.2L18 7.3v13.2H7z"/><path d="M14 3.5v4h4"/><path d="M9.5 11h5"/><path d="M9.5 14h5"/><path d="M9.5 17h3.2"/></svg></button>
+      <button type="button" class="right-tab" id="notificationsTab" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 17.3h7.6"/><path d="M10 20.1c.45.35.98.52 1.6.52s1.15-.17 1.6-.52"/><path d="M5.8 16.1c1.05-.9 1.55-1.9 1.55-3.7v-1.6c0-2.65 1.78-4.65 4.65-4.65s4.65 2 4.65 4.65v1.6c0 1.8.5 2.8 1.55 3.7"/><path d="M10.4 4.45a1.7 1.7 0 0 1 3.2 0"/></svg></button>
+    </nav>
+    <section class="right-panel broker-panel" id="brokerPanel">
+      <div class="broker-top"><button type="button" id="brokerBtn" class="broker-btn"><span id="brokerDot" class="broker-dot"></span>Connect to brokerage</button><button type="button" id="disconnectBtn" class="disconnect-btn" title="Disconnect broker">■</button></div>
+      <section class="portfolio-panel" id="portfolioPanel"><div class="portfolio-head"><span class="portfolio-title">Portfolio</span><button type="button" id="portfolioRefresh" class="portfolio-refresh">↻</button></div><div id="portfolioList"><div class="report-empty">Connect IBKR to view holdings.</div></div></section>
+      <section class="portfolio-composition" id="portfolioComposition" aria-label="Portfolio composition"></section>
+    </section>
+    <section class="right-panel preview-panel" id="previewPanel">
+      <article class="preview-card">
+        <div class="preview-head"><div class="preview-title"><span id="previewTitle">File Preview</span><small id="previewMeta">Select a report or uploaded file to preview.</small></div><button type="button" class="preview-close" id="previewClose" title="Close preview">×</button></div>
+        <div class="preview-body" id="previewBody"><div class="preview-empty">No file selected.</div></div>
+      </article>
+    </section>
+    <section class="right-panel notifications-panel" id="notificationsPanel">
+      <article class="notifications-card">
+        <div class="notifications-head"><span class="notifications-title">Notifications</span><button type="button" class="notifications-refresh" id="notificationsRefresh" title="Refresh notifications">↻</button></div>
+        <div class="notifications-body" id="notificationsBody"><div class="preview-empty">No notifications yet.</div></div>
+      </article>
+    </section>
+  </aside>
+</div>
+<div id="skillsPop" class="popover"></div>
+<div id="schedulerPop" class="popover"></div>
+<div id="toast" class="toast"></div>
+<div id="approvalBackdrop" class="approval-backdrop" aria-hidden="true">
+  <div class="approval-card" role="dialog" aria-modal="true" aria-labelledby="approvalTitle">
+    <h2 class="approval-title" id="approvalTitle">Approve tool use?</h2>
+    <p class="approval-subtitle">The agent wants permission before running a tool that may change local state or interact with an external service.</p>
+    <div class="approval-tool">
+      <div><span class="approval-tool-name" id="approvalToolName"></span><span class="approval-mode" id="approvalMode"></span></div>
+      <div class="approval-summary" id="approvalSummary"></div>
+    </div>
+    <div class="approval-actions">
+      <button type="button" id="approvalDeny" class="approval-deny">Deny</button>
+      <button type="button" id="approvalOnce">Allow once</button>
+      <button type="button" id="approvalAlways" class="approval-primary">Allow always</button>
+    </div>
+  </div>
+</div>
+<div class="composer-wrap" id="composerWrap">
+  <form id="form">
+    <div class="pending-steers" id="pendingSteers"></div>
+    <div class="selected-skills" id="selectedSkills"></div>
+    <textarea id="message" placeholder="Analyse the quality and valuation of AAPL..."></textarea>
+    <div class="bar">
+      <button type="button" id="skillsBtn" class="pill" title="Choose a skill">Skills</button>
+      <button type="button" id="schedulerBtn" class="pill" title="Choose or manage schedules">Schedulers</button>
+      <button type="button" id="fileBtn" class="pill icon-pill" title="Upload a text or PDF file" aria-label="Upload a text or PDF file">📎</button>
+      <input type="file" id="fileInput" accept=".txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.xml,.html,.htm,.log,.yml,.yaml,.pdf,text/*,application/json,application/pdf" hidden>
+      <span class="spacer"></span>
+      <button id="send" aria-label="Send"><span id="sendIcon">↑</span></button>
+    </div>
+  </form>
+</div>
+<script>
+const chat=document.querySelector('#chat'), form=document.querySelector('#form'), input=document.querySelector('#message'), composer=document.querySelector('#composerWrap');
+let followChatOutput=true;
+chat.addEventListener('scroll',()=>{followChatOutput=chat.scrollHeight-chat.clientHeight-chat.scrollTop<=32;},{passive:true});
+chat.addEventListener('wheel',event=>{if(event.deltaY<0)followChatOutput=false;},{passive:true});
+function followLatestChat(){if(followChatOutput)chat.scrollTop=chat.scrollHeight;}
+
+const skillsBtn=document.querySelector('#skillsBtn'), schedulerBtn=document.querySelector('#schedulerBtn'), fileBtn=document.querySelector('#fileBtn'), fileInput=document.querySelector('#fileInput'), send=document.querySelector('#send'), sendIcon=document.querySelector('#sendIcon');
+const selectedSkillsEl=document.querySelector('#selectedSkills'), pendingSteersEl=document.querySelector('#pendingSteers');
+const skillsPop=document.querySelector('#skillsPop'), schedulerPop=document.querySelector('#schedulerPop');
+const briefsSection=document.querySelector('#briefsSection'), briefsToggle=document.querySelector('#briefsToggle'), briefsList=document.querySelector('#briefsList');
+const reportsSection=document.querySelector('#reportsSection'), reportsToggle=document.querySelector('#reportsToggle'), reportsList=document.querySelector('#reportsList');
+const eventsSection=document.querySelector('#eventsSection'), eventsToggle=document.querySelector('#eventsToggle'), eventsList=document.querySelector('#eventsList'), eventsRefresh=document.querySelector('#eventsRefresh'), eventsAdd=document.querySelector('#eventsAdd');
+const brokerTab=document.querySelector('#brokerTab'), previewTab=document.querySelector('#previewTab'), notificationsTab=document.querySelector('#notificationsTab'), brokerPanel=document.querySelector('#brokerPanel'), previewPanel=document.querySelector('#previewPanel'), notificationsPanel=document.querySelector('#notificationsPanel');
+const previewTitle=document.querySelector('#previewTitle'), previewMeta=document.querySelector('#previewMeta'), previewBody=document.querySelector('#previewBody'), previewClose=document.querySelector('#previewClose'), notificationsBody=document.querySelector('#notificationsBody'), notificationsRefresh=document.querySelector('#notificationsRefresh');
+const brokerBtn=document.querySelector('#brokerBtn'), brokerDot=document.querySelector('#brokerDot'), disconnectBtn=document.querySelector('#disconnectBtn'), portfolioRefresh=document.querySelector('#portfolioRefresh'), portfolioList=document.querySelector('#portfolioList'), portfolioComposition=document.querySelector('#portfolioComposition');
+const toast=document.querySelector('#toast');
+const approvalBackdrop=document.querySelector('#approvalBackdrop'), approvalToolName=document.querySelector('#approvalToolName'), approvalMode=document.querySelector('#approvalMode'), approvalSummary=document.querySelector('#approvalSummary');
+const approvalOnce=document.querySelector('#approvalOnce'), approvalAlways=document.querySelector('#approvalAlways'), approvalDeny=document.querySelector('#approvalDeny');
+let selectedSkills=[], selectedFiles=[], selectedScheduler='', pendingSteers=[], running=false, schedulerSnapshot=new Map(), currentPreview=null;
+let approvalQueue=[], activeApproval=null;
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function slugify(s){ return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+function skillIdFromContent(content){
+  const fm=String(content||'').match(/^---\s*\n([\s\S]*?)\n---/);
+  const fmName=fm&&fm[1].match(/^name:\s*(.+)$/m);
+  const h1=String(content||'').match(/^#\s+(.+)$/m);
+  const candidate=(fmName&&fmName[1]&&fmName[1].trim()!=='new-skill'?fmName[1]: '') || (h1&&h1[1]&&h1[1].trim()!=='New Skill'?h1[1]: '');
+  return slugify(candidate) || `skill-${Date.now()}`;
+}
+function clearEmpty(){const e=chat.querySelector('.empty'); if(e)e.remove();}
+function closePops(){skillsPop.classList.remove('open'); schedulerPop.classList.remove('open');}
+function activeRightKind(){
+  if(!document.body.classList.contains('right-open')) return '';
+  if(brokerPanel.classList.contains('active')) return 'broker';
+  if(previewPanel.classList.contains('active')) return 'preview';
+  if(notificationsPanel.classList.contains('active')) return 'notifications';
+  if(document.querySelector('#eventsPanel')?.classList.contains('active')) return 'events';
+  return '';
+}
+function openRightPanel(kind){
+  document.body.classList.add('right-open');
+  const broker=kind==='broker', preview=kind==='preview', notifications=kind==='notifications';
+  brokerPanel.classList.toggle('active', broker);
+  previewPanel.classList.toggle('active', preview);
+  notificationsPanel.classList.toggle('active', notifications);
+  brokerTab.classList.toggle('active', broker);
+  previewTab.classList.toggle('active', preview);
+  notificationsTab.classList.toggle('active', notifications);
+  document.querySelector('#eventsPanel')?.classList.toggle('active', kind==='events');
+  document.querySelector('#eventsTab')?.classList.toggle('active', kind==='events');
+}
+function toggleRightPanel(kind){ activeRightKind()===kind ? closeRightPanel() : openRightPanel(kind); }
+function closeRightPanel(){
+  document.body.classList.remove('right-open');
+  brokerPanel.classList.remove('active'); previewPanel.classList.remove('active'); notificationsPanel.classList.remove('active');
+  brokerTab.classList.remove('active'); previewTab.classList.remove('active'); notificationsTab.classList.remove('active');
+  document.querySelector('#eventsPanel')?.classList.remove('active'); document.querySelector('#eventsTab')?.classList.remove('active');
+}
+function clearPreview(){
+  currentPreview=null;
+  previewTitle.textContent='File Preview';
+  previewMeta.textContent='Select a report or uploaded file to preview.';
+  previewBody.classList.remove('pdf');
+  previewBody.innerHTML='<div class="preview-empty">No file selected.</div>';
+  if(activeRightKind()==='preview') closeRightPanel();
+}
+function setTextPreview(kind, path, title, meta, content){
+  currentPreview={kind,path};
+  previewTitle.textContent=title||'File Preview';
+  previewMeta.textContent=meta||'';
+  previewBody.classList.remove('pdf');
+  previewBody.replaceChildren();
+  if(kind==='report'||/\.md$/i.test(path||'')){const rendered=document.createElement('div');rendered.className='answer';renderAnswerMarkdown(rendered,content||'');previewBody.append(rendered);}
+  else {const pre=document.createElement('pre');pre.textContent=content||'';previewBody.append(pre);}
+  openRightPanel('preview');
+}
+function setPdfPreview(file){
+  currentPreview={kind:'file',path:file.path};
+  const src='/api/files/raw?path='+encodeURIComponent(file.path);
+  previewTitle.textContent=file.name||'PDF Preview';
+  previewMeta.textContent=`pdf · ${file.path}`;
+  previewBody.classList.add('pdf');
+  previewBody.innerHTML=`<iframe class="pdf-frame" src="${src}" title="${esc(file.name||'PDF preview')}"></iframe>`;
+  openRightPanel('preview');
+}
+async function previewUploadedFile(file){
+  if(!file||!file.path) return;
+  if(currentPreview&&currentPreview.kind==='file'&&currentPreview.path===file.path&&activeRightKind()==='preview'){ closeRightPanel(); return; }
+  if(String(file.name||file.path).toLowerCase().endsWith('.pdf')){ setPdfPreview(file); return; }
+  previewTitle.textContent=file.name||'File Preview';
+  previewMeta.textContent=file.path;
+  previewBody.classList.remove('pdf');
+  previewBody.innerHTML='<div class="preview-empty">Loading preview...</div>';
+  openRightPanel('preview');
+  try{
+    const data=await fetch('/api/files/content?path='+encodeURIComponent(file.path),{cache:'no-store'}).then(r=>{ if(!r.ok) return r.text().then(t=>{throw new Error(t)}); return r.json(); });
+    const suffix=data.truncated?'\n\n---\nPreview truncated. Use read_file for focused full-context reading.':'';
+    setTextPreview('file', file.path, data.name||file.name, `${data.fileType||'file'} · ${file.path}`, (data.content||'')+suffix);
+  }catch(error){ previewBody.innerHTML=`<div class="preview-empty">Unable to preview file: ${esc(error.message||error)}</div>`; }
+}
+
+function fmtDate(s){ try { return new Date(s).toLocaleString(); } catch(e) { return s || ''; } }
+function fmtEventDate(s){ const d=new Date(s); if(Number.isNaN(d.getTime())) return ''; return d.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric',timeZone:'America/New_York'}).replace(',', ','); }
+function fmtEventTime(s){ const d=new Date(s); if(Number.isNaN(d.getTime())) return ''; return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York',timeZoneName:'short'}).replace(' EDT',' ET').replace(' EST',' ET'); }
+async function loadEvents(){
+  if(!eventsList) return;
+  try{
+    const list=await fetch('/api/events/upcoming?months=6',{cache:'no-store'}).then(r=>r.json());
+    if(!list.length){ eventsList.innerHTML='<div class="report-empty">No upcoming events yet.</div>'; return; }
+    eventsList.innerHTML=list.map(e=>`<div class="event-row" data-id="${esc(e.id)}" title="${esc(e.notes||e.source||'')}"><div class="event-main"><div class="event-when"><span class="event-date">${e.startsAt?esc(fmtEventDate(e.startsAt)):'尚未确定'}</span><span class="event-time">${e.startsAt?esc(e.type==='POLITICAL'?'All day':e.type==='EARNINGS'?'Time unconfirmed':fmtEventTime(e.startsAt)):''}</span></div><div class="event-title">${esc(e.title)}</div>${/^https?:\/\//.test(e.sourceUrl||'')?`<a href="${esc(e.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#aaa">${e.source==='fed'?'Official calendar · time expected':'Source'}</a>`:''}</div><button type="button" class="event-more" data-id="${esc(e.id)}" aria-label="Event actions">•••</button><div class="event-menu" data-menu-for="${esc(e.id)}"><button type="button" data-action="edit">Edit</button><button type="button" data-action="delete" class="danger-link">Delete</button></div></div>`).join('');
+    bindEventMenus(list);
+  }catch(error){ eventsList.innerHTML='<div class="report-empty">Unable to load events.</div>'; }
+}
+function eventLocalParts(startsAt){ const d=new Date(startsAt); const pad=n=>String(n).padStart(2,'0'); const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d).reduce((a,p)=>(a[p.type]=p.value,a),{}); return {date:`${parts.year}-${parts.month}-${parts.day}`, time:`${parts.hour}:${parts.minute}`}; }
+function eventStartsAt(date,time){ return `${date}T${time||'09:00'}:00`; }
+function eventForm(e={}){ const parts=e.startsAt?eventLocalParts(e.startsAt):{date:new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'}),time:'09:00'}; return `<div class="skill-form event-form"><div class="schedule-head"><span>${e.id?'Edit Event':'New Event'}</span><button type="button" class="schedule-close" id="cancelEvent" aria-label="Close">×</button></div><input id="eventTitle" placeholder="Title" value="${esc(e.title||'')}"><input id="eventDate" type="date" value="${esc(parts.date)}"><input id="eventTime" type="time" value="${esc(parts.time)}"><div class="schedule-actions"><button type="button" class="pill" id="saveEvent">${e.id?'Save':'Create'}</button></div></div>`; }
+function openEventForm(e={}){ eventsList.innerHTML=eventForm(e); eventsSection.classList.remove('collapsed'); eventsList.querySelector('#cancelEvent').onclick=()=>loadEvents(); eventsList.querySelector('#saveEvent').onclick=async()=>{ const payload={title:eventsList.querySelector('#eventTitle').value,type:e.type||'CUSTOM',startsAt:eventStartsAt(eventsList.querySelector('#eventDate').value,eventsList.querySelector('#eventTime').value),timezone:'America/New_York',source:e.source||'manual'}; const url=e.id?`/api/events/${encodeURIComponent(e.id)}`:'/api/events'; const method=e.id?'PUT':'POST'; const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!res.ok){ showToast(`Unable to save event: ${await res.text()}`); return; } showToast(e.id?'Event updated':'Event created'); await loadEvents(); }; }
+function bindEventMenus(list){
+  eventsList.querySelectorAll('.event-more').forEach(b=>b.onclick=e=>{ e.stopPropagation(); eventsList.querySelectorAll('.event-menu.open').forEach(m=>{ if(m.dataset.menuFor!==b.dataset.id)m.classList.remove('open'); }); eventsList.querySelectorAll('.event-more.open').forEach(more=>{ if(more!==b)more.classList.remove('open'); }); b.classList.toggle('open'); eventsList.querySelector(`[data-menu-for="${CSS.escape(b.dataset.id)}"]`)?.classList.toggle('open'); });
+  eventsList.querySelectorAll('.event-menu button').forEach(b=>b.onclick=async e=>{ e.stopPropagation(); const menu=b.closest('.event-menu'), id=menu.dataset.menuFor, item=list.find(x=>x.id===id), action=b.dataset.action; if(action==='edit'){ openEventForm(item); return; } if(action==='delete'){ await fetch(`/api/events/${encodeURIComponent(id)}`,{method:'DELETE'}); showToast('Event deleted'); await loadEvents(); } });
+}
+async function refreshEvents(){
+  if(!eventsRefresh) return;
+  eventsRefresh.textContent='…';
+  try{const response=await fetch('/api/events/refresh',{method:'POST'});if(!response.ok)throw Error('HTTP '+response.status);const result=await response.json();await loadEvents();const unavailable=Object.entries(result.sourceStatus||{}).filter(([key,value])=>value.startsWith('unavailable')).map(([key])=>key);showToast(unavailable.length?'部分来源暂不可用，保留原日历：'+unavailable.join(', '):'Upcoming events refreshed');}
+  catch(error){ showToast(`Unable to refresh events: ${error.message||error}`); }
+  finally{ eventsRefresh.textContent='↻'; }
+}
+
+function schedulerStatusLabel(x){ const v=String((x&&x.enabled===false)?'PAUSED':(x&&x.status)||x||'').toUpperCase(); return {IDLE:'Waiting',PAUSED:'Paused',RUNNING:'Running',RETRYING:'Retrying',NEEDS_APPROVAL:'Needs approval'}[v] || String((x&&x.status)||x||''); }
+function nextRunLabel(x){ return x&&x.enabled===false?'Paused':`Next ${fmtDate(x&&x.nextRunAt)}`; }
+async function loadReports(){
+  try{
+    const list=await fetch('/api/reports').then(r=>r.json());
+    const dailyBriefs=list.filter(r=>String(r.path||'').startsWith('portfolio-news-radar/'));
+    const companyReports=list.filter(r=>/^[^/]+\/company-research-[^/]+\.md$/.test(String(r.path||'').replaceAll('\\','/')));
+    renderReportList(briefsList, dailyBriefs, 'No Daily Portfolio Briefs yet.', 'Daily Brief', true, 'Daily Portfolio Brief');
+    renderReportList(reportsList, companyReports, 'No Markdown reports yet.', null, true, 'Company Research Report');
+  }catch(e){
+    briefsList.innerHTML='<div class="report-empty">Unable to load daily briefs.</div>';
+    reportsList.innerHTML='<div class="report-empty">Unable to load reports.</div>';
+  }
+}
+function companyReportLabel(title,ticker){
+  let name=String(title||'').replace(/\s*(?:[-–—:]\s*)?(?:Company Research Report|公司研究报告)\s*$/i,'').trim();
+  name=name.replace(/\s*[（(](?:NYSE|NASDAQ|AMEX)\s*:\s*([A-Z.]+)[）)]/gi,' ($1)').replace(/\s+(?:PBC|Inc\.?|Corporation|Corp\.?)\s*(?=\()/gi,' ');
+  if(ticker&&/^[A-Z][A-Z.]{0,9}$/.test(ticker)&&!name.includes('('+ticker+')'))name+=' ('+ticker+')';
+  return name;
+}
+function renderReportList(container, list, emptyText, fallbackLabel, deletable=false, deleteLabel='Report'){
+  list=list.map(report=>({...report,title:fallbackLabel?report.title:companyReportLabel(report.title,report.ticker)}));
+  if(!list.length){ container.innerHTML=`<div class="report-empty">${esc(emptyText)}</div>`; return; }
+  container.innerHTML=list.map(r=>deletable
+    ? `<div class="report-row" data-path="${esc(r.path)}"><button type="button" class="report-item" data-path="${esc(r.path)}" data-title="${esc(r.title)}">${esc(r.title)}<small>${esc(fallbackLabel || r.ticker || 'Reports')} · ${esc(fmtDate(r.modifiedAt))}</small></button><div class="report-actions"><button type="button" class="report-delete" data-path="${esc(r.path)}" data-label="${esc(deleteLabel)}" title="Delete ${esc(deleteLabel)}" aria-label="Delete ${esc(deleteLabel)}">×</button><button type="button" class="report-download" data-path="${esc(r.path)}" title="Download ${esc(deleteLabel)}" aria-label="Download ${esc(deleteLabel)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button></div></div>`
+    : `<button type="button" class="report-item" data-path="${esc(r.path)}" data-title="${esc(r.title)}">${esc(r.title)}<small>${esc(fallbackLabel || r.ticker || 'Reports')} · ${esc(fmtDate(r.modifiedAt))}</small></button>`
+  ).join('');
+  container.querySelectorAll('.report-item').forEach(btn=>btn.onclick=()=>openReport(btn.dataset.path, btn.dataset.title));
+  container.querySelectorAll('.report-download').forEach(btn=>btn.onclick=e=>{
+    e.stopPropagation();
+    downloadFile('reports/'+(btn.dataset.path||''));
+  });
+  container.querySelectorAll('.report-delete').forEach(btn=>btn.onclick=async e=>{
+    e.stopPropagation();
+    const path=btn.dataset.path;
+    if(!path) return;
+    const label=btn.dataset.label||'Report';
+    if(!confirm(`Delete this ${label}?`)) return;
+    try{
+      const res=await fetch('/api/reports?path='+encodeURIComponent(path),{method:'DELETE'});
+      if(!res.ok) throw new Error(await res.text());
+      if(currentPreview&&currentPreview.kind==='report'&&currentPreview.path===path) clearPreview();
+      showToast(`${label} deleted`);
+      await loadReports();
+    }catch(error){
+      showToast(`Unable to delete brief: ${error.message||error}`);
+    }
+  });
+}
+function downloadFile(path){
+  if(!path) return;
+  const link=document.createElement('a');
+  link.href='/api/files/download?path='+encodeURIComponent(path);
+  link.rel='noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+async function openReport(path, title){
+  if(currentPreview&&currentPreview.kind==='report'&&currentPreview.path===path&&activeRightKind()==='preview'){ closeRightPanel(); return; }
+  previewTitle.textContent=title||'Markdown Report';
+  previewMeta.textContent=path||'';
+  previewBody.classList.remove('pdf');
+  previewBody.innerHTML='<div class="preview-empty">Loading preview...</div>';
+  openRightPanel('preview');
+  try{
+    const content=await fetch('/api/reports/content?path='+encodeURIComponent(path),{cache:'no-store'}).then(r=>{ if(!r.ok) return r.text().then(t=>{throw new Error(t)}); return r.text(); });
+    setTextPreview('report', path, title, `Markdown report · ${path}`, content);
+  }catch(error){ previewBody.innerHTML=`<div class="preview-empty">Unable to preview report: ${esc(error.message||error)}</div>`; }
+}
+briefsToggle.onclick=()=>briefsSection.classList.toggle('collapsed');
+reportsToggle.onclick=()=>reportsSection.classList.toggle('collapsed');
+eventsToggle.addEventListener('click', e=>{ if(e.target.closest('#eventsRefresh,#eventsAdd')) return; eventsSection.classList.toggle('collapsed'); });
+eventsRefresh.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); refreshEvents(); });
+eventsRefresh.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); refreshEvents(); } });
+eventsAdd.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); openEventForm(); });
+eventsAdd.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); e.stopPropagation(); openEventForm(); } });
+
+async function loadBrokerStatus(){
+  try{
+    const s=await fetch('/api/ibkr/mcp/status').then(r=>r.json());
+    const ok=!!s.authorized && s.state==='CONNECTED';
+    brokerDot.classList.toggle('on', ok);
+    disconnectBtn.classList.toggle('show', ok);
+    brokerBtn.lastChild.nodeValue=ok?' Brokerage Connected':' Connect to brokerage';
+    if(ok) await loadPortfolio();
+  }catch(e){ brokerDot.classList.remove('on'); disconnectBtn.classList.remove('show'); }
+}
+async function loadPortfolio(){
+  portfolioList.innerHTML='<div class="report-empty">Loading portfolio...</div>';
+  try{
+    const data=await fetch('/api/ibkr/mcp/portfolio/minimal').then(r=>r.json());
+    if(data.status==='MCP_ERROR'){ portfolioList.innerHTML=`<div class="report-empty">${esc(data.message||'Unable to load portfolio.')}</div>`; renderPortfolioComposition([]); return; }
+    const holdings=data.holdings||[];
+    if(!holdings.length){ portfolioList.innerHTML='<div class="report-empty">No positions returned.</div>'; renderPortfolioComposition([]); return; }
+    const sortedHoldings=[...holdings].sort((a,b)=>holdingValue(b)-holdingValue(a) || String(a.ticker||'').localeCompare(String(b.ticker||'')));
+    portfolioList.innerHTML='<div class="portfolio-cols"><div>Ticker</div><div>Company</div><div>Market Price</div></div>'+sortedHoldings.map(h=>`<div class="holding"><div class="holding-ticker">${esc(h.ticker||'—')}</div><div class="holding-name" title="${esc(h.name||'')}">${esc(h.name||'')}</div><div class="holding-price">${h.market_price==null?'—':esc(Number(h.market_price).toFixed(2))} ${esc(h.currency||'')}</div></div>`).join('');
+    renderPortfolioComposition(sortedHoldings);
+  }catch(e){ portfolioList.innerHTML='<div class="report-empty">Unable to load portfolio.</div>'; renderPortfolioComposition([]); }
+}
+function holdingValue(h){
+  const direct=Number(h.base_market_value ?? h.baseMarketValue ?? h.market_value_base ?? h.market_value ?? h.marketValue ?? h.position_value ?? h.positionValue);
+  if(Number.isFinite(direct) && direct>0) return direct;
+  const qty=Number(h.quantity ?? h.position ?? h.qty ?? h.shares);
+  const price=Number(h.market_price ?? h.marketPrice);
+  return Number.isFinite(qty) && Number.isFinite(price) ? Math.abs(qty*price) : 0;
+}
+function shortCompanyName(name, ticker){
+  const value=String(name||ticker||'—').replace(/\b(INC|CORP|CORPORATION|PLC|SA|AB|NV|LTD|LIMITED|GROUP|HOLDINGS?)\b\.?/ig,'').replace(/\s+/g,' ').trim();
+  return value.length>16?value.slice(0,15).trim()+'…':value;
+}
+function renderPortfolioComposition(holdings){
+  if(!portfolioComposition) return;
+  const rows=(holdings||[])
+    .map(h=>({ticker:h.ticker||'—', value:holdingValue(h)}))
+    .filter(x=>x.value>0)
+    .sort((a,b)=>b.value-a.value || String(a.ticker).localeCompare(String(b.ticker)));
+  const total=rows.reduce((sum,x)=>sum+x.value,0);
+  if(!rows.length || total<=0){ portfolioComposition.classList.remove('show'); portfolioComposition.innerHTML=''; return; }
+  const colors=['#43c5ee','#52d6a8','#ffd24d','#a78bfa','#ff6b8a','#f59e0b','#7dd3fc','#b86cff','#9ca3af','#22d3ee'];
+  const cx=160, cy=160, r=82, sw=42, labelR=121, c=2*Math.PI*r;
+  let offset=0;
+  const parts=rows.map((row,i)=>{
+    const pct=row.value/total;
+    const rawDash=pct*c;
+    const dash=i===rows.length-1?Math.max(0,c-offset):rawDash;
+    const mid=(offset+dash/2)/c*Math.PI*2-Math.PI/2;
+    const labelX=cx+Math.cos(mid)*labelR;
+    const labelY=cy+Math.sin(mid)*labelR;
+    const edgeX=cx+Math.cos(mid)*(r+sw/2+2);
+    const edgeY=cy+Math.sin(mid)*(r+sw/2+2);
+    const part={row,pct,dash,offset,mid,labelX,labelY,edgeX,edgeY,color:colors[i%colors.length],side:labelX>=cx?'right':'left'};
+    offset+=dash;
+    return part;
+  });
+  const slices=parts.map(p=>`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${p.color}" stroke-width="${sw}" stroke-dasharray="${Math.min(c,p.dash+0.9).toFixed(2)} ${Math.max(0,c-p.dash-0.9).toFixed(2)}" stroke-dashoffset="${(-p.offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`).join('');
+  const crowdedTop=parts.filter(p=>p.labelY<70).sort((a,b)=>a.labelX-b.labelX);
+  crowdedTop.forEach((p,i)=>{
+    const middle=(crowdedTop.length-1)/2;
+    const shift=(i-middle)*17;
+    p.adjustedLabelX=p.labelX+shift;
+  });
+  const labels=parts.map(p=>{
+    const anchor=p.side==='right'?'start':'end';
+    const x=p.adjustedLabelX ?? p.labelX;
+    const y=p.labelY;
+    const top=p.labelY<70;
+    const lineEndX=top ? x : x+(p.side==='right'?-8:8);
+    const lineEndY=top ? y+6 : y;
+    return `<line x1="${p.edgeX.toFixed(1)}" y1="${p.edgeY.toFixed(1)}" x2="${lineEndX.toFixed(1)}" y2="${lineEndY.toFixed(1)}" stroke="#777" stroke-width="1" opacity=".55"/><text x="${x.toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="${anchor}" class="composition-label">${esc(p.row.ticker)}</text><text x="${x.toFixed(1)}" y="${(y+10).toFixed(1)}" text-anchor="${anchor}" class="composition-label-sub">${(p.pct*100).toFixed(1)}%</text>`;
+  }).join('');
+  portfolioComposition.innerHTML=`<svg class="composition-chart" viewBox="0 0 320 320" role="img">${slices}<circle cx="${cx}" cy="${cy}" r="${r-sw/1.75}" fill="#212121"/>${labels}</svg>`;
+  portfolioComposition.classList.add('show');
+}
+
+brokerBtn.onclick=()=>{ openRightPanel('broker'); window.open('/api/ibkr/oauth/connect','_blank','noopener,noreferrer,width=920,height=760'); setTimeout(loadBrokerStatus, 4000); };
+brokerTab.onclick=()=>{ const closing=activeRightKind()==='broker'; toggleRightPanel('broker'); if(!closing) loadBrokerStatus(); };
+previewTab.onclick=()=>toggleRightPanel('preview');
+notificationsTab.onclick=()=>{ const closing=activeRightKind()==='notifications'; toggleRightPanel('notifications'); if(!closing) loadNotifications(); };
+notificationsRefresh.onclick=()=>loadNotifications();
+async function loadNotifications(){
+  const notificationsList=notificationsBody;
+  try {
+    const response=await fetch('/api/schedules/notifications',{cache:'no-store'});
+    if(!response.ok)throw Error('Unable to load notifications');
+    const items=await response.json();
+    notificationsTab.classList.toggle('has-unread',items.some(item=>!item.readAt));
+    notificationsTab.setAttribute('aria-label',items.some(item=>!item.readAt)?'Notifications · unread messages':'Notifications');
+    notificationsList.replaceChildren();
+    if(!items.length){const empty=document.createElement('div');empty.className='report-empty';empty.textContent='No notifications yet.';notificationsList.append(empty);}
+    const groups=new Map(),today=new Date();today.setHours(0,0,0,0);const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
+    items.sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
+    for(const item of items){const date=new Date(item.createdAt),day=new Date(date);day.setHours(0,0,0,0);const key=Number.isNaN(date.getTime())?'Earlier':day>=today?'Today':day>=yesterday?'Yesterday':date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});let group=groups.get(key);if(!group){group=document.createElement('section');group.className='notification-group';const heading=document.createElement('div');heading.className='notification-group-title';heading.textContent=key;group.append(heading);groups.set(key,group);notificationsList.append(group);}const row=document.createElement('article');row.className='notification-item';const title=document.createElement('strong');title.textContent=item.title||item.schedulerTitle||'Notification';const body=document.createElement('p');body.textContent=item.message||'';const time=document.createElement('small');time.textContent=item.createdAt?new Date(item.createdAt).toLocaleString():'';const remove=document.createElement('button');remove.textContent='×';remove.title='Delete notification';remove.setAttribute('aria-label','Delete notification '+(item.title||''));remove.onclick=async()=>{const response=await fetch('/api/schedules/notifications/'+encodeURIComponent(item.id),{method:'DELETE'});if(response.ok)await loadNotifications();else showToast('Unable to delete notification');};row.append(title,remove,body,time);group.append(row);}
+    if(activeRightKind()==='notifications'&&document.visibilityState==='visible'){
+      const unread=items.filter(item=>!item.readAt).map(item=>item.id);
+      if(unread.length){const marked=await fetch('/api/schedules/notifications/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(unread)});if(marked.ok){notificationsTab.classList.remove('has-unread');notificationsTab.setAttribute('aria-label','Notifications');}}
+    }
+
+  }catch(error){notificationsList.textContent='Notifications unavailable. Please retry.';}
+}
+previewClose.onclick=()=>closeRightPanel();
+portfolioRefresh.onclick=()=>loadPortfolio();
+disconnectBtn.onclick=async()=>{ await fetch('/api/ibkr/oauth/disconnect'); portfolioList.innerHTML='<div class="report-empty">Connect IBKR to view holdings.</div>'; renderPortfolioComposition([]); await loadBrokerStatus(); };
+function place(pop, btn){
+  pop.classList.add('open');
+  const fr=form.getBoundingClientRect();
+  const maxWidth = Math.min(520, fr.width);
+  pop.style.width=Math.max(320, maxWidth)+'px';
+  const fresh=pop.getBoundingClientRect();
+  pop.style.left=Math.max(16, Math.min(fr.left, innerWidth-fresh.width-16))+'px';
+  pop.style.top=Math.max(72, fr.top-fresh.height-1.0)+'px';
+}
+function setFlowRow(flow, key, icon, title, muted='', cls='', rowCls=''){
+  let row=flow.querySelector(`[data-key="${CSS.escape(key)}"]`);
+  if(!row){ row=document.createElement('div'); row.dataset.key=key; flow.appendChild(row); }
+  row.className=['flow-row', rowCls].filter(Boolean).join(' ');
+  row.innerHTML=`<div class="flow-icon ${cls}">${icon}</div><div><span class="flow-title">${esc(title)}</span>${muted?`<span class="flow-muted">${esc(muted)}</span>`:''}</div>`;
+  followLatestChat();
+}
+function formatElapsed(ms){ const s=Math.max(0,Math.round(ms/1000)), m=Math.floor(s/60), r=s%60; return m?`${m}m ${r}s`:`${r}s`; }
+
+async function loadSkills(){
+  const list=await fetch('/api/skills',{cache:'no-store'}).then(r=>r.json());
+  const items=skillListMarkup(list);
+  skillsPop.innerHTML=items+`<div class="new-schedule"><button type="button" class="pill" id="showCreateSkill">Create</button></div>`;
+  bindSkillList(list);
+  skillsPop.querySelector('#showCreateSkill').onclick=()=>openSkillCreator();
+  if(skillsPop.classList.contains('open')) place(skillsPop, skillsBtn);
+}
+function skillListMarkup(list){
+  return list.length?list.map(x=>`<div class="skill-item ${selectedSkills.some(s=>s.id===x.id)?'active':''}" data-id="${esc(x.id)}">
+    <button type="button" class="item skill-main" data-id="${esc(x.id)}" data-name="${esc(x.name)}">${esc(x.name)}<small>${esc(x.description)}</small></button>
+    <button type="button" class="skill-more" data-id="${esc(x.id)}" aria-label="Skill actions">•••</button>
+    <div class="skill-menu" data-menu-for="${esc(x.id)}"><button type="button" data-action="edit">Edit</button><button type="button" data-action="delete" class="danger-link">Delete</button></div>
+  </div>`).join(''):'<div class="report-empty">No skills yet.</div>';
+}
+function renderPendingSteers(){
+  pendingSteersEl.innerHTML=pendingSteers.map(x=>`<div class="steer-card" data-id="${x.id}"><span class="steer-icon">↳</span><span class="steer-text">${esc(x.message)}</span><button type="button" class="steer-action ${x.sent?'sent':''}" data-id="${x.id}">${x.sent?'Queued':'↪ Steer'}</button><button type="button" class="steer-delete" data-id="${x.id}" aria-label="Delete queued message">🗑</button></div>`).join('');
+  pendingSteersEl.classList.toggle('show', pendingSteers.length>0);
+  pendingSteersEl.querySelectorAll('.steer-delete').forEach(b=>b.onclick=async()=>{const item=pendingSteers.find(x=>x.id===b.dataset.id);if(item?.sent){try{const result=await sessionJson(`/api/sessions/${currentSessionId}/queued/${item.id}`,{method:'DELETE'});if(!result.deleted)showToast('Message already consumed by the agent');}catch(error){showToast(error.message);return;}}pendingSteers=pendingSteers.filter(x=>x.id!==b.dataset.id);renderPendingSteers();});
+  pendingSteersEl.querySelectorAll('.steer-action').forEach(b=>b.onclick=()=>steerPendingMessage(b.dataset.id));
+}
+function addPendingSteer(message){
+  pendingSteers.push({id:`steer-${Date.now()}-${Math.random().toString(16).slice(2)}`,message,sent:false});
+  renderPendingSteers();
+}
+async function steerPendingMessage(id){
+  const item=pendingSteers.find(x=>x.id===id);
+  if(!item || item.sent) return;
+  if(running && activeRunId){
+    item.sent=true; renderPendingSteers();
+    try{
+      const response=await fetch(`/api/agent/runs/${encodeURIComponent(activeRunId)}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.message})});
+      if(!response.ok)throw Error('Queue request failed');const result=await response.json();if(result.queued&&!consumedSteerIds.has(result.id))item.id=result.id;else pendingSteers=pendingSteers.filter(x=>x!==item);renderPendingSteers();showToast(result.queued?'Message queued':'Stop requested');
+    }catch(error){ item.sent=false; renderPendingSteers(); showToast('Unable to steer current run'); }
+    return;
+  }
+  pendingSteers=pendingSteers.filter(x=>x.id!==id); renderPendingSteers();
+  input.value=item.message;
+  form.requestSubmit();
+}
+const consumedSteerIds=new Set();
+function clearSentSteers(ids){
+  if(ids)ids.forEach(id=>consumedSteerIds.add(id));
+  const before=pendingSteers.length;
+  pendingSteers=pendingSteers.filter(x=>ids?!consumedSteerIds.has(x.id):!x.sent);
+  if(pendingSteers.length!==before) renderPendingSteers();
+}
+function attachmentName(file){return String(file.name||file.path?.split('/').pop()||'File').replace(/^\d{13}-/,'');}
+function renderSelectedSkills(){
+  const skillChips=selectedSkills.map(s=>`<div class="selected-skill-chip" data-kind="skill" data-id="${esc(s.id)}">Skill: <span>${esc(s.name)}</span><button type="button" class="selected-skill-clear" data-kind="skill" data-id="${esc(s.id)}" aria-label="Clear selected skill">✕</button></div>`).join('');
+  const fileChips=selectedFiles.map(f=>`<div class="selected-skill-chip attachment-draft" data-kind="file" data-path="${esc(f.path)}" title="${esc(attachmentName(f))}" tabindex="0" role="button"><span class="attachment-icon" aria-hidden="true">▤</span><span class="attachment-info"><span class="attachment-name">${esc(attachmentName(f))}</span><span class="attachment-type">${esc(attachmentName(f).split('.').pop().toUpperCase())}</span></span><button type="button" class="selected-skill-clear" data-kind="file" data-path="${esc(f.path)}" aria-label="Remove attachment">✕</button></div>`).join('');
+  selectedSkillsEl.innerHTML=skillChips+fileChips;
+  selectedSkillsEl.classList.toggle('show', selectedSkills.length+selectedFiles.length>0);
+  selectedSkillsEl.querySelectorAll('.selected-skill-clear').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    if(b.dataset.kind==='file'){
+      selectedFiles=selectedFiles.filter(f=>f.path!==b.dataset.path);
+      if(currentPreview&&currentPreview.kind==='file'&&currentPreview.path===b.dataset.path) clearPreview();
+    } else selectedSkills=selectedSkills.filter(s=>s.id!==b.dataset.id);
+    renderSelectedSkills(); refreshSkillSelectionState();
+  });
+  selectedSkillsEl.querySelectorAll('.attachment-draft').forEach(chip=>chip.onkeydown=e=>{if(e.target===chip&&(e.key==='Enter'||e.key===' ')){e.preventDefault();chip.click();}});
+  selectedSkillsEl.querySelectorAll('.selected-skill-chip[data-kind="file"]').forEach(chip=>chip.onclick=e=>{
+    if(e.target.closest('.selected-skill-clear')) return;
+    const file=selectedFiles.find(f=>f.path===chip.dataset.path);
+    previewUploadedFile(file);
+  });
+}
+function refreshSkillSelectionState(){
+  skillsPop.querySelectorAll('.skill-item').forEach(row=>row.classList.toggle('active', selectedSkills.some(s=>s.id===row.dataset.id)));
+}
+function selectSkill(id, name){ if(!selectedSkills.some(s=>s.id===id)) selectedSkills.push({id,name}); skillsBtn.textContent='Skills'; renderSelectedSkills(); refreshSkillSelectionState(); closePops(); }
+function bindSkillList(list){
+  skillsPop.querySelectorAll('.skill-main').forEach(b=>b.onclick=e=>{ e.stopPropagation(); selectSkill(b.dataset.id, b.dataset.name); });
+  skillsPop.querySelectorAll('.skill-item').forEach(row=>row.onclick=e=>{ if(e.target.closest('.skill-more,.skill-menu')) return; const item=list.find(x=>x.id===row.dataset.id); if(item) selectSkill(item.id,item.name); });
+  skillsPop.querySelectorAll('.skill-more').forEach(b=>b.onclick=e=>{ e.stopPropagation(); skillsPop.querySelectorAll('.skill-menu.open').forEach(m=>{ if(m.dataset.menuFor!==b.dataset.id)m.classList.remove('open'); }); skillsPop.querySelectorAll('.skill-more.open').forEach(more=>{ if(more!==b)more.classList.remove('open'); }); b.classList.toggle('open'); skillsPop.querySelector(`[data-menu-for="${CSS.escape(b.dataset.id)}"]`).classList.toggle('open'); place(skillsPop, skillsBtn); });
+  skillsPop.querySelectorAll('.skill-menu button').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const menu=b.closest('.skill-menu'), id=menu.dataset.menuFor, item=list.find(x=>x.id===id), action=b.dataset.action;
+    if(action==='edit'){ await openSkillEditor(item); return; }
+    if(action==='delete'){ await fetch(`/api/skills/${encodeURIComponent(id)}`,{method:'DELETE'}); if(selectedSkills.some(s=>s.id===id)){ selectedSkills=selectedSkills.filter(s=>s.id!==id); skillsBtn.textContent='Skills'; renderSelectedSkills(); } showToast('Skill deleted'); await loadSkills(); place(skillsPop, skillsBtn); }
+  });
+}
+async function openSkillEditor(item){
+  const content=await fetch(`/api/skills/${encodeURIComponent(item.id)}/content`,{cache:'no-store'}).then(r=>r.text());
+  skillsPop.innerHTML=`<div class="skill-form" id="skillForm" data-id="${esc(item.id)}"><div class="schedule-head"><span>Edit ${esc(item.name)}</span><button type="button" class="schedule-close" id="cancelSkill" aria-label="Close">×</button></div><textarea class="skill-prompt" id="skillContent">${esc(content)}</textarea><div class="schedule-actions"><button type="button" class="pill" id="saveSkill">Save</button></div></div>`;
+  skillsPop.querySelector('#cancelSkill').onclick=async()=>{ await loadSkills(); place(skillsPop, skillsBtn); };
+  skillsPop.querySelector('#saveSkill').onclick=async()=>{ const saved=await fetch(`/api/skills/${encodeURIComponent(item.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:skillsPop.querySelector('#skillContent').value})}).then(r=>r.json()); selectedSkills=selectedSkills.map(s=>s.id===item.id?{id:s.id,name:saved.name}:s); renderSelectedSkills(); skillsBtn.textContent='Skills'; showToast(`Skill updated: ${saved.name}`); await loadSkills(); place(skillsPop, skillsBtn); };
+  place(skillsPop, skillsBtn);
+}
+function openSkillCreator(){
+  const template='---\nname: new-skill\ndescription: Describe when this skill should be used.\n---\n\n# New Skill\n\n## Purpose\n\nDescribe the skill workflow here.\n';
+  skillsPop.innerHTML=`<div class="skill-form" id="skillForm"><div class="schedule-head"><span>New</span><button type="button" class="schedule-close" id="cancelSkill" aria-label="Close">×</button></div><textarea class="skill-prompt" id="skillContent">${esc(template)}</textarea><div class="schedule-actions"><button type="button" class="pill" id="saveSkill">Create</button></div></div>`;
+  skillsPop.querySelector('#cancelSkill').onclick=async()=>{ await loadSkills(); place(skillsPop, skillsBtn); };
+  skillsPop.querySelector('#saveSkill').onclick=async()=>{
+    const content=skillsPop.querySelector('#skillContent').value;
+    const id=skillIdFromContent(content);
+    try{
+      const res=await fetch(`/api/skills/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
+      if(!res.ok) throw new Error(await res.text());
+      const saved=await res.json();
+      showToast(`Skill created: ${saved.name}`);
+      await loadSkills(); place(skillsPop, skillsBtn);
+    }catch(error){ showToast(`Unable to create skill: ${error.message||error}`); }
+  };
+  place(skillsPop, skillsBtn);
+}
+function freqLabel(x){return {daily:'Daily',weekly:'Weekly'}[x]||x||'Daily';}
+function dayLabel(x){return {SUN:'Sunday',MON:'Monday',TUE:'Tuesday',WED:'Wednesday',THU:'Thursday',FRI:'Friday',SAT:'Saturday'}[x]||'Sunday';}
+function timeLabel(x){ if(!x)return '9:00'; const [h,m]=x.split(':'); return `${Number(h)}:${m}`; }
+function showToast(msg){ if(!toast){ console.log(msg); return; } toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 5200); }
+const decidedApprovalIds=new Set();
+function showApprovalRequest(request){
+  if(decidedApprovalIds.has(request.id)||activeApproval?.id===request.id||approvalQueue.some(a=>a.id===request.id))return;
+  approvalQueue.push(request);
+  if(!activeApproval) showNextApprovalRequest();
+}
+function showNextApprovalRequest(){
+  activeApproval=approvalQueue.shift()||null;
+  if(!activeApproval){ approvalBackdrop.classList.remove('open'); approvalBackdrop.setAttribute('aria-hidden','true'); return; }
+  approvalToolName.textContent=activeApproval.rule?.toolName||'Tool';
+  approvalMode.textContent=activeApproval.toolMode||'';
+  approvalSummary.textContent=(activeApproval.summary||'No additional details were provided.')+'\n\n'+JSON.stringify(activeApproval.arguments||{},null,2);
+  approvalBackdrop.classList.add('open');
+  approvalBackdrop.setAttribute('aria-hidden','false');
+  approvalOnce.focus({preventScroll:true});
+}
+async function decideApproval(decision){
+  if(!activeApproval) return;
+  const pending=activeApproval,id=pending.id;
+  decidedApprovalIds.add(id);approvalQueue=approvalQueue.filter(a=>a.id!==id);
+  activeApproval=null;
+  approvalBackdrop.classList.remove('open');
+  approvalBackdrop.setAttribute('aria-hidden','true');
+  try{
+    const response=await fetch(`/api/agent/approvals/${encodeURIComponent(id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})});
+    if(!response.ok) throw new Error('Approval submission failed');
+    const result=await response.json(); if(!result.accepted)showToast('This approval is no longer pending.');
+  }catch(e){ decidedApprovalIds.delete(id);approvalQueue.unshift(pending);showToast('Unable to submit tool approval. Please retry.'); }
+  showNextApprovalRequest();
+}
+if(approvalOnce) approvalOnce.onclick=()=>decideApproval('allow_once');
+if(approvalAlways) approvalAlways.onclick=()=>decideApproval('allow_always');
+if(approvalDeny) approvalDeny.onclick=()=>decideApproval('deny');
+function scheduleOptions(){ return Array.from({length:24},(_,h)=>`<option value="${String(h).padStart(2,'0')}:00">${h}:00</option>`).join(''); }
+function dayOptions(){ return [['SUN','Sunday'],['MON','Monday'],['TUE','Tuesday'],['WED','Wednesday'],['THU','Thursday'],['FRI','Friday'],['SAT','Saturday']].map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); }
+function schedulerApprovalBlock(x={}){
+  const a=x.pendingApproval;
+  if(!a) return '';
+  const toolName=a.rule?.toolName||'a tool';
+  const ruleContent=a.rule?.ruleContent||{};
+  const ruleDetail=Object.keys(ruleContent).length?` · ${esc(JSON.stringify(ruleContent))}`:'';
+  return `<div class="schedule-section-label">Approval needed</div>
+  <div class="scheduler-approval-card">
+    <div class="scheduler-approval-title">This scheduler wants to use ${esc(toolName)}</div>
+    <div class="scheduler-approval-meta">${esc(a.toolMode||'INTERACTIVE')}${ruleDetail} ${a.summary?`· ${esc(a.summary)}`:''}</div>
+    <div class="scheduler-approval-actions">
+      <button type="button" class="pill danger-link" data-scheduler-approval="deny">Deny</button>
+      <button type="button" class="pill" data-scheduler-approval="allow_once">Allow once</button>
+      <button type="button" class="pill" data-scheduler-approval="allow_always">Allow always</button>
+    </div>
+  </div>`;
+}
+async function decideSchedulerApproval(scheduleId, approvalId, decision){
+  const saved=await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/approvals/${encodeURIComponent(approvalId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})}).then(r=>{ if(!r.ok) return r.text().then(t=>{throw new Error(t||r.statusText)}); return r.json(); });
+  showToast(decision==='deny'?'Scheduler approval denied':decision==='allow_always'?'Tool approved for this scheduler':'Tool approved once');
+  await loadSchedules();
+  const list=await fetch('/api/schedules',{cache:'no-store'}).then(r=>r.json());
+  const item=list.find(x=>x.id===scheduleId)||saved;
+  const items=scheduleListMarkup(list);
+  schedulerPop.innerHTML=items+scheduleForm(item);
+  bindScheduleForm(item);
+  place(schedulerPop, schedulerBtn);
+}
+function scheduleForm(x={}){ const isEdit=!!x.id; return `<div class="schedule-form" id="scheduleForm" data-id="${esc(x.id||'')}">
+  <div class="schedule-head"><span>${isEdit?'Edit':'New'}</span><button type="button" class="schedule-close" id="cancelSchedule" aria-label="Close">×</button></div>
+  <input id="scheduleTitle" class="schedule-title-input" placeholder="Scheduled task title" value="${esc(x.title||'')}">
+  <textarea id="schedulePrompt" class="schedule-prompt" placeholder="Describe what the agent should do">${esc(x.prompt||'')}</textarea>
+  <div class="schedule-section-label">Frequency</div>
+  <div class="schedule-card">
+    <div class="schedule-row"><label>Repeat</label><select id="scheduleFrequency"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></div>
+    <div class="schedule-row" id="scheduleDayRow"><label>On</label><select id="scheduleDayOfWeek">${dayOptions()}</select></div>
+    <div class="schedule-row"><label>At</label><select id="scheduleTime">${scheduleOptions()}</select></div>
+  </div>
+  ${schedulerApprovalBlock(x)}
+  <div class="schedule-actions">${isEdit?`<button type="button" class="pill" id="toggleSchedule">${x.enabled?'Pause':'Resume'}</button><button type="button" class="pill danger-link" id="deleteSchedule">Delete</button><button type="button" class="pill" id="runSchedule">Run now</button>`:''}<button type="button" class="pill" id="saveSchedule">${isEdit?'Save':'Create'}</button></div>
+</div>`; }
+function bindScheduleForm(x={}){
+  const sf=schedulerPop.querySelector('#scheduleForm'), freq=sf.querySelector('#scheduleFrequency'), day=sf.querySelector('#scheduleDayOfWeek'), dayRow=sf.querySelector('#scheduleDayRow'), time=sf.querySelector('#scheduleTime');
+  if(x.frequency==='weekdays'){const legacy=new Option('Existing schedule',x.frequency);freq.add(legacy);}
+  freq.value=x.frequency||'daily'; day.value=x.dayOfWeek||'SUN'; time.value=x.time||'09:00';
+  const sync=()=>{ dayRow.style.display=freq.value==='weekly'?'flex':'none'; place(schedulerPop, schedulerBtn); };
+  freq.onchange=sync; sync();
+  sf.querySelectorAll('[data-scheduler-approval]').forEach(b=>b.onclick=async()=>{
+    if(!x.pendingApproval) return;
+    try{ await decideSchedulerApproval(x.id, x.pendingApproval.id, b.dataset.schedulerApproval); }
+    catch(error){ showToast(`Unable to submit scheduler approval: ${error.message||error}`); }
+  });
+  sf.querySelector('#cancelSchedule').onclick=async()=>{ await loadSchedules(); place(schedulerPop, schedulerBtn); };
+  const id=sf.dataset.id;
+  sf.querySelector('#saveSchedule').onclick=async()=>{
+    const payload={title:sf.querySelector('#scheduleTitle').value,prompt:sf.querySelector('#schedulePrompt').value,frequency:freq.value,dayOfWeek:day.value,time:time.value,enabled:x.enabled??true};
+    const url=id?`/api/schedules/${encodeURIComponent(id)}`:'/api/schedules';
+    const method=id?'PUT':'POST';
+    const saved=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
+    selectedScheduler=saved.id; schedulerBtn.textContent='Schedulers'; showToast(`Scheduler ${id?'updated':'created'}: ${saved.title}`); await loadSchedules(); place(schedulerPop, schedulerBtn);
+  };
+  const toggle=sf.querySelector('#toggleSchedule'); if(toggle) toggle.onclick=async()=>{
+    const optimistic={...x, enabled:!(x.enabled??true), status:(x.enabled??true)?'PAUSED':'IDLE', nextRunAt:(x.enabled??true)?null:x.nextRunAt};
+    Object.assign(x, optimistic);
+    toggle.textContent=x.enabled?'Pause':'Resume';
+    updateScheduleRow(id, x);
+    const saved=await fetch(`/api/schedules/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:x.enabled})}).then(r=>r.json());
+    const normalizedSaved={...saved, enabled:!!saved.enabled, status:saved.enabled?'IDLE':'PAUSED'};
+    Object.assign(x, normalizedSaved);
+    toggle.textContent=x.enabled?'Pause':'Resume';
+    updateScheduleRow(id, x);
+    showToast(x.enabled?'Scheduler resumed':'Scheduler paused');
+    place(schedulerPop, schedulerBtn);
+  };
+  const del=sf.querySelector('#deleteSchedule'); if(del) del.onclick=async()=>{ await fetch(`/api/schedules/${encodeURIComponent(id)}`,{method:'DELETE'}); showToast('Scheduler deleted'); selectedScheduler=''; schedulerBtn.textContent='Schedulers'; await loadSchedules(); place(schedulerPop, schedulerBtn); };
+  const run=sf.querySelector('#runSchedule'); if(run) run.onclick=async()=>{
+    const runningItem={...x,status:'RUNNING',lastRunStatus:'RUNNING'};
+    updateScheduleRow(id, runningItem);
+    await fetch(`/api/schedules/${encodeURIComponent(id)}/run`,{method:'POST'});
+    showToast('Scheduler started');
+    place(schedulerPop, schedulerBtn);
+  };
+}
+async function loadSchedules(){
+  const list=await fetch('/api/schedules',{cache:'no-store'}).then(r=>r.json());
+  notifyScheduleChanges(list);
+  const items=scheduleListMarkup(list);
+  schedulerPop.innerHTML=items+`<div class="new-schedule"><button type="button" class="pill" id="showCreateSchedule">Create</button></div>`;
+  bindScheduleList(list);
+  schedulerPop.querySelector('#showCreateSchedule').onclick=()=>{ schedulerPop.innerHTML=items+scheduleForm({frequency:'daily',dayOfWeek:'SUN',time:'09:00',enabled:true}); bindScheduleForm({}); place(schedulerPop, schedulerBtn); };
+  if(schedulerPop.classList.contains('open')) place(schedulerPop, schedulerBtn);
+}
+function scheduleListMarkup(list){
+  return list.length?list.map(x=>{ const isRunning=['RUNNING','RETRYING'].includes(String(x.status||'').toUpperCase()); return `<div class="schedule-item ${x.id===selectedScheduler?'active':''} ${isRunning?'running':''}" data-id="${esc(x.id)}">
+    <span class="schedule-run-indicator" aria-hidden="true"></span>
+    <button type="button" class="item schedule-main" data-id="${esc(x.id)}">${esc(x.title)}<small>${esc(scheduleLine(x))}</small></button>
+    <button type="button" class="schedule-more" data-id="${esc(x.id)}" aria-label="Scheduler actions">•••</button>
+    <div class="schedule-menu" data-menu-for="${esc(x.id)}">
+      <button type="button" data-action="run">▷ Run now</button>
+      <button type="button" data-action="toggle">${x.enabled?'Ⅱ Pause':'▶ Resume'}</button>
+      <button type="button" data-action="delete" class="danger-link">Delete</button>
+    </div>
+  </div>`; }).join(''):'<div class="report-empty">No schedulers yet.</div>';
+}
+function scheduleLine(x){ return `${schedulerStatusLabel(x)} · ${freqLabel(x.frequency)}${x.frequency==='weekly'?` on ${dayLabel(x.dayOfWeek)}`:''} at ${timeLabel(x.time)} · ${nextRunLabel(x)}${x.lastRunStatus&&x.lastRunStatus!=='NEVER_RUN'?` · last ${x.lastRunStatus}`:''}`; }
+function updateScheduleRow(id, item){
+  const row=schedulerPop.querySelector(`.schedule-item[data-id="${CSS.escape(id)}"]`);
+  if(!row) return;
+  row.classList.toggle('running',['RUNNING','RETRYING'].includes(String(item.status||'').toUpperCase()));
+  const small=row.querySelector('.schedule-main small'); if(small) small.textContent=scheduleLine(item);
+  const toggle=row.querySelector('.schedule-menu [data-action="toggle"]'); if(toggle) toggle.textContent=item.enabled?'Ⅱ Pause':'▶ Resume';
+  row.querySelector('.schedule-menu')?.classList.remove('open');
+  row.querySelector('.schedule-more')?.classList.remove('open');
+}
+function bindScheduleList(list){
+  const openEditor=id=>{ const item=list.find(x=>x.id===id); if(!item) return; const items=scheduleListMarkup(list); schedulerPop.innerHTML=items+scheduleForm(item); bindScheduleForm(item); place(schedulerPop, schedulerBtn); };
+  schedulerPop.querySelectorAll('.schedule-main').forEach(b=>b.onclick=e=>{ e.stopPropagation(); openEditor(b.dataset.id); });
+  schedulerPop.querySelectorAll('.schedule-item').forEach(row=>row.onclick=e=>{ if(e.target.closest('.schedule-more,.schedule-menu')) return; openEditor(row.dataset.id); });
+  schedulerPop.querySelectorAll('.schedule-more').forEach(b=>b.onclick=e=>{ e.stopPropagation(); schedulerPop.querySelectorAll('.schedule-menu.open').forEach(m=>{ if(m.dataset.menuFor!==b.dataset.id)m.classList.remove('open'); }); schedulerPop.querySelectorAll('.schedule-more.open').forEach(more=>{ if(more!==b)more.classList.remove('open'); }); b.classList.toggle('open'); schedulerPop.querySelector(`[data-menu-for="${CSS.escape(b.dataset.id)}"]`).classList.toggle('open'); place(schedulerPop, schedulerBtn); });
+  schedulerPop.querySelectorAll('.schedule-menu button').forEach(b=>b.onclick=async e=>{
+    e.stopPropagation();
+    const menu=b.closest('.schedule-menu'), id=menu.dataset.menuFor, item=list.find(x=>x.id===id), action=b.dataset.action;
+    if(action==='run'){ updateScheduleRow(id,{...item,status:'RUNNING',lastRunStatus:'RUNNING'}); await fetch(`/api/schedules/${encodeURIComponent(id)}/run`,{method:'POST'}); showToast('Scheduler started'); }
+    if(action==='toggle'){
+      const optimistic={...item, enabled:!(item.enabled??true), status:(item.enabled??true)?'PAUSED':'IDLE', nextRunAt:(item.enabled??true)?null:item.nextRunAt};
+      updateScheduleRow(id, optimistic);
+      const saved=await fetch(`/api/schedules/${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:optimistic.enabled})}).then(r=>r.json());
+      const normalizedSaved={...saved, enabled:!!saved.enabled, status:saved.enabled?'IDLE':'PAUSED'};
+      Object.assign(item, normalizedSaved);
+      updateScheduleRow(id, normalizedSaved);
+      showToast(normalizedSaved.enabled?'Scheduler resumed':'Scheduler paused');
+      place(schedulerPop, schedulerBtn);
+      return;
+    }
+    if(action==='delete'){ await fetch(`/api/schedules/${encodeURIComponent(id)}`,{method:'DELETE'}); if(selectedScheduler===id){ selectedScheduler=''; schedulerBtn.textContent='Schedulers'; } showToast('Scheduler deleted'); }
+    await loadSchedules(); place(schedulerPop, schedulerBtn);
+  });
+}
+
+async function refreshSchedulesQuietly(){
+  try{
+    const list=await fetch('/api/schedules',{cache:'no-store'}).then(r=>r.json());
+    notifyScheduleChanges(list);
+    if(!schedulerPop.classList.contains('open')) return;
+    const form=schedulerPop.querySelector('#scheduleForm');
+    if(!form){
+      const items=scheduleListMarkup(list);
+      schedulerPop.innerHTML=items+`<div class="new-schedule"><button type="button" class="pill" id="showCreateSchedule">Create</button></div>`;
+      bindScheduleList(list);
+      schedulerPop.querySelector('#showCreateSchedule').onclick=()=>{ schedulerPop.innerHTML=items+scheduleForm({frequency:'daily',dayOfWeek:'SUN',time:'09:00',enabled:true}); bindScheduleForm({}); place(schedulerPop, schedulerBtn); };
+      place(schedulerPop, schedulerBtn);
+      return;
+    }
+    const id=form.dataset.id;
+    const item=list.find(x=>x.id===id);
+    if(!item) return;
+    updateScheduleRow(id, item);
+    const hasApprovalCard=!!form.querySelector('.scheduler-approval-card');
+    const needsRerender=Boolean(item.pendingApproval)!==hasApprovalCard || String(item.status||'').toUpperCase()==='NEEDS_APPROVAL';
+    if(needsRerender){
+      const items=scheduleListMarkup(list);
+      schedulerPop.innerHTML=items+scheduleForm(item);
+      bindScheduleForm(item);
+      place(schedulerPop, schedulerBtn);
+    }
+  }catch(_){ }
+}
+function notifyScheduleChanges(list){
+  for(const x of list){
+    const old=schedulerSnapshot.get(x.id);
+    if(old && old.lastRunAt!==x.lastRunAt && x.lastRunStatus && x.lastRunStatus!=='RUNNING') showToast(`${x.title}: ${x.lastRunStatus}`);
+    schedulerSnapshot.set(x.id,{lastRunAt:x.lastRunAt,lastRunStatus:x.lastRunStatus});
+  }
+}
+skillsBtn.onclick=
+async e=>{e.stopPropagation(); await loadSkills(); schedulerPop.classList.remove('open'); skillsPop.classList.toggle('open'); if(skillsPop.classList.contains('open')) place(skillsPop, skillsBtn);};
+schedulerBtn.onclick=async e=>{e.stopPropagation(); await loadSchedules(); skillsPop.classList.remove('open'); schedulerPop.classList.toggle('open'); if(schedulerPop.classList.contains('open')) place(schedulerPop, schedulerBtn);};
+fileBtn.onclick=()=>fileInput.click();
+fileInput.onchange=async()=>{
+  const file=fileInput.files&&fileInput.files[0];
+  fileInput.value='';
+  if(!file) return;
+  const data=new FormData();
+  data.append('file', file);
+  try{
+    fileBtn.disabled=true;
+    const res=await fetch('/api/files/upload',{method:'POST',body:data});
+    if(!res.ok) throw new Error(await res.text());
+    const uploaded=await res.json();
+    selectedFiles=[...selectedFiles.filter(f=>f.path!==uploaded.path), uploaded];
+    renderSelectedSkills();
+    showToast(`File uploaded: ${uploaded.name}`);
+  }catch(error){ showToast(`Unable to upload file: ${error.message||error}`); }
+  finally{ fileBtn.disabled=false; }
+};
+document.addEventListener('click', e=>{if(!e.target.closest('.popover,.pill')) closePops();});
+addEventListener('resize', closePops);
+
+function setRunning(v){running=v; send.disabled=false; sendIcon.textContent=v?'↵':'↑';}
+input.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+loadReports();
+loadEvents();
+loadNotifications();
+loadBrokerStatus();
+setInterval(loadBrokerStatus, 60000);
+setInterval(loadEvents, 60000);
+setInterval(loadNotifications, 60000);
+setInterval(refreshSchedulesQuietly, 5000);
+</script>
+<script src="/answer-renderer.js?v=20260917-duration-real"></script>
+<script src="/session-ui.js?v=20260917-duration-real"></script>
+<script src="/ui-polish.js?v=20260917-duration-real"></script>
+</body>
+</html>

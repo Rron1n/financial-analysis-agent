@@ -1,0 +1,87 @@
+spring:
+  config:
+    import:
+      - optional:file:./.secrets/application-secrets.yml
+      - optional:file:${user.home}/.config/financial-analysis-agent/application-secrets.yml
+  application:
+    name: financial-analysis-agent
+  codec:
+    max-in-memory-size: 2MB
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+agent:
+  system-prompt-path: classpath:com/rronin/financialagent/AGENT.md
+  max-loops: 16
+  max-tool-result-chars: 12000
+  max-turn-tool-result-chars: 80000
+  model-routing:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${OPENAI_API_KEY:${secrets.openai-api-key:}}
+    primary-reasoning: medium
+    primary: qwen3.8-max
+    auxiliary: qwen3.8-flash
+    auxiliary-reasoning: medium
+    roles:
+      GENERAL_VALIDATION: gpt-5.4-mini
+      CLAIM_EXTRACTION: gpt-5.4-mini
+      FINANCIAL_AUDIT: gpt-5.4-mini
+    embedding: text-embedding-v4
+  qwen:
+    base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    api-key: ${DASHSCOPE_API_KEY:${secrets-dashscope.api-key:}}
+  financial-datasets:
+    base-url: https://api.financialdatasets.ai
+    api-key: ${FINANCIAL_DATASETS_API_KEY:${secrets.financial-datasets-api-key:}}
+  tavily:
+    base-url: https://api.tavily.com
+    api-key: ${TAVILY_API_KEY:${secrets.tavily-api-key:}}
+  x:
+    base-url: https://api.x.com
+    api-key: ${X_API_KEY:${secrets.x-api-key:}}
+  finnhub:
+    base-url: https://finnhub.io
+    api-key: ${FINNHUB_API_KEY:${secrets.finnhub-api-key:}}
+  fred:
+    base-url: https://api.stlouisfed.org/fred
+    api-key: ${FRED_API_KEY:${secrets.fred-api-key:}}
+  bls:
+    base-url: https://api.bls.gov/publicAPI/v2
+    api-key: ${BLS_API_KEY:${secrets.bls-api-key:}}
+  chroma:
+    base-url: ${CHROMA_BASE_URL:http://localhost:8000}
+    enabled: true
+  ibkr:
+    mcp-url: ${IBKR_MCP_URL:https://api.ibkr.com/v1/api/mcp-public}
+    access-token: ${IBKR_ACCESS_TOKEN:}
+    client-id: ${IBKR_MCP_CLIENT_ID:}
+    client-secret: ${IBKR_MCP_CLIENT_SECRET:}
+    redirect-uri: ${IBKR_MCP_REDIRECT_URI:http://localhost:8081/api/ibkr/oauth/callback}
+    token-file: ${user.home}/.financial-analysis-agent/ibkr-mcp-token.json
+    enabled: true
+  filesystem:
+    root: ${user.dir}
+    max-read-chars: 60000
+  memory:
+    root: ${user.home}/.financial-analysis-agent/memory
+    extraction-enabled: true
+    llm-compaction-enabled: true
+    max-session-chars: 60000
+    max-daily-chars: 80000
+    decay-half-life-days: 30
+    mmr-lambda: 0.72
+  scheduler:
+    portfolio-news-enabled: true
+    portfolio-news-cron: "0 0 9 * * MON-FRI"
+    zone: Asia/Shanghai
+    root: ${user.home}/.financial-analysis-agent/schedulers
+  events:
+    root: ${user.home}/.financial-analysis-agent/events
+    months-ahead: 6
