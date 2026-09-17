@@ -19,30 +19,6 @@ Java 21 · Spring Boot 3.5 · Spring WebFlux · Project Reactor · Spring AI dep
 
 The application owns its agent loop, message protocol, provider gateway, approval logic, and review lifecycle; it does not depend on a fixed multi-agent workflow framework.
 
-## Architecture
-
-```mermaid
-flowchart TD
-    UI[Web UI] --> API[WebFlux API / SSE]
-    API --> Loop[Agent Run Engine]
-    Loop --> Model[Model Gateway]
-    Model --> Loop
-    Loop --> Approval[Tool Approval]
-    Approval --> Tools[Financial APIs / MCP / File Tools]
-    Tools --> Loop
-    Memory[Session and Topic Memory] <--> Loop
-    Loop --> Checks[Deterministic Checks]
-    Checks --> General[General Validation]
-    Checks --> Claims[Claim Extraction]
-    General --> Audit[Financial Audit]
-    Claims --> Audit
-    Audit -->|PASS| Result[Answer / Report]
-    Audit -->|REVISE| Loop
-    Scheduler[Schedules / Event Tracking] --> Loop
-```
-
-See [Architecture](docs/architecture.md) for execution, memory, review, and budget details.
-
 ## Quick start
 
 ### Prerequisites
