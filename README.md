@@ -15,7 +15,7 @@ A Java financial research agent for portfolio analysis, company research, social
 
 ## Technology
 
-Java 21 · Spring Boot 3.5 · Spring WebFlux · Project Reactor · Spring AI dependencies · MCP · Chroma · SSE · vanilla JavaScript
+Java 21 · Spring Boot 3.5 · Spring AI dependencies · MCP · Chroma · SSE
 
 The application owns its agent loop, message protocol, provider gateway, approval logic, and review lifecycle; it does not depend on a fixed multi-agent workflow framework.
 
