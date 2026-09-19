@@ -2,16 +2,23 @@
 
 A Java financial research agent for portfolio analysis, company research, social sentiment research, and recurring investment briefs. It combines a tool-driven agent loop with persistent memory, explicit tool approvals, and independent candidate-answer review.
 
-## Features
+## Core capabilities
 
-- **Interactive research:** portfolio return/risk analysis, company fundamentals, and research grounded in retrieved financial and public-source data.
-- **Agent execution:** streaming responses, tool dispatch, mid-run user amendments, cancellation, and persistent session history.
-- **Reusable skills:** company research, X research, and portfolio news briefs with task-specific research instructions.
-- **Memory:** background session-memory extraction, topic memory, keyword/vector retrieval through Chroma, and dynamic context compaction.
-- **Tool permissions:** `DEFAULT` and `AUTO` approval modes, with `ALLOW`, `ASK`, and `DENY` decisions and user/session rules.
-- **Answer review:** deterministic checks, parallel general validation and claim extraction, followed by financial audit and bounded revisions.
-- **Scheduled research:** temporary and persistent schedules, portfolio briefs, financial-event reminders, and post-release outcome tracking.
-- **Web interface:** SSE progress updates, session history, attachments, report previews, and notifications.
+| Area | What the application does |
+|---|---|
+| Agent Loop | Iterates through model responses and tool results, supports mid-run amendments, and bounds execution with loop/token limits. |
+| Memory System | Persists sessions, extracts topic memory, combines keyword and Chroma retrieval, and compacts context using coverage-aware snapshots. |
+| Financial tools and skills | Connects portfolio, market, financial and news tools; loads reusable company, X and portfolio-brief research instructions. |
+| Tool approvals | Evaluates ALLOW/ASK/DENY before execution using approval mode, rules and tool safety metadata. |
+| Financial answer review | Checks completion and format, extracts material claims, then audits source support and financial consistency before final publication. |
+| Schedules and events | Runs recurring research, generates portfolio briefs, and tracks financial-event reminders and released outcomes. |
+
+## Explore the implementation
+
+- [Code guide](docs/code-guide.md): source entry points, execution sequence and representative tests.
+- [Behavior and limits](docs/behavior-and-limits.md): exact contracts, budget meanings and implementation boundaries.
+- [Configuration](docs/configuration.md): credentials and external services.
+- [Testing](docs/testing.md): offline checks and optional local acceptance.
 
 ## Technology
 
