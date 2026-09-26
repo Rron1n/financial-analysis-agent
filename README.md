@@ -4,9 +4,9 @@ A Java financial research agent for portfolio analysis, company research, social
 
 ## Demo
 
-[![Watch the Financial Analysis Agent demo](docs/media/demo-preview.png)](docs/media/financial-analysis-agent-demo.mp4)
+[![Financial Analysis Agent demo preview](docs/media/demo-preview.gif)](https://raw.githubusercontent.com/Rron1n/financial-analysis-agent/main/docs/media/financial-analysis-agent-demo.mp4)
 
-**[Watch the full demo (4 min 37 sec)](docs/media/financial-analysis-agent-demo.mp4)** — portfolio briefs, financial-event tracking, document-based company research, mid-run user input, skills, memory, and tool approval.
+**[Watch the full demo (4 min 37 sec)](https://raw.githubusercontent.com/Rron1n/financial-analysis-agent/main/docs/media/financial-analysis-agent-demo.mp4)** — portfolio briefs, financial-event tracking, document-based company research, mid-run user input, skills, memory, and tool approval.
 
 ## Core capabilities
 
