@@ -2,6 +2,12 @@
 
 A Java financial research agent for portfolio analysis, company research, social sentiment research, and recurring investment briefs. It combines a tool-driven agent loop with persistent memory, explicit tool approvals, and independent candidate-answer review.
 
+## Demo
+
+[![Watch the Financial Analysis Agent demo](docs/media/demo-preview.png)](docs/media/financial-analysis-agent-demo.mp4)
+
+**[Watch the full demo (4 min 37 sec)](docs/media/financial-analysis-agent-demo.mp4)** — portfolio briefs, financial-event tracking, document-based company research, mid-run user input, skills, memory, and tool approval.
+
 ## Core capabilities
 
 | Area | What the application does |
